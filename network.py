@@ -1,6 +1,8 @@
 import keras
 from data_reader import DataReader
 import os
+import sys, getopt
+from recurrentnetwork import RNNRnunner
 
 def create_model():
     model = keras.Sequential()
@@ -29,11 +31,62 @@ def load_data():
     sample_data = DataReader("MS Fall Study").get_data()
     return (sample_data)
 
-def main():
-    model = create_model()
-    data = load_data()
-    print(data[0].shape)
-    print(data[1].shape)
-    train_model(model, data)
+def Help():
+    print('''network.py 
+             -g <use test data generator, def: 0>
+             -t <RNN type: simple, GRU, LSTM, def: simple> 
+             -d <training data size, def: 320> 
+             -e <number of epochs, def: 30> 
+             -s <steps in the sequence, def: 6> 
+             -h <number of hidden units, def:75>
+             -v <verbose,def:1>
+             -m <multi threaded, def:0''')
 
-main()
+def main(argv):
+    # setup options from command line
+    testDataGenerator = False
+    rnnType = 'simple'
+    trainingDataSize = 320
+    numberOfEpochs = 30
+    stepsInSequence = 6 
+    hiddenUnits = 75
+    verbose = 1
+    multiThreaded = 0
+    try:
+        opts, args = getopt.getopt(argv,"?g:t:d:e:s:h:v:m:")
+    except getopt.GetoptError:
+        Help()
+        return
+    for opt, arg in opts:
+        if opt == '-?':
+            Help()
+            return
+        elif opt == '-g':
+            testDataGenerator = arg
+        elif opt == '-t':
+            rnnType = arg
+        elif opt == '-d':
+            trainingDataSize = int(arg)
+        elif opt == '-e':
+            numberOfEpochs = int(arg)
+        elif opt == '-s':
+            stepsInSequence = int(arg)
+        elif opt == '-h':
+            hiddenUnits = int(arg)
+        elif opt == '-v':
+            verbose = int(arg)
+        elif opt == '-m':
+            multiThreaded = int(arg)
+
+    if testDataGenerator:
+        run = RNNRnunner(verbose,multiThreaded)
+        run.RunRNN(rnnType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits)
+    else:
+        model = create_model()
+        data = load_data()
+        print(data[0].shape)
+        print(data[1].shape)
+        train_model(model, data)
+
+if __name__ == "__main__":  
+    main(sys.argv[1:])
