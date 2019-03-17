@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 import os
+import glob
+import pickle
+import keras
 
 class DataReader():
     def __init__(self, filepath):
@@ -16,20 +19,27 @@ class DataReader():
             else:
                 df[i] = 0
         df = df.values
-        df = df[:3]
+        df = keras.utils.np_utils.to_categorical(df)
         return (df)
+
+    # a function where you can pass the patient test and sensor data you want it will return the corresponding data
+    def getData(self, patientNumber, testType, sensorType):
+        pass
 
     # for now I am just loading a small sample of x values from one particular test
     def get_x_values(self):
         data = []
         patients = next(os.walk(self.master_filepath))[1]
-        for patient in patients[:3]:
+        for patient in patients:
             # for now we just load sensor readings from one test for each patient
             test_directory = os.path.join(self.master_filepath, patient, "Session_1", "Home", "MC10", "anterior_thigh_right")
-            test_directory = os.path.join(test_directory, os.listdir(test_directory)[0])
-            test_directory = os.path.join(test_directory, os.listdir(test_directory)[0], "accel.csv")
-            df = pd.read_csv(test_directory)
-            data.append(np.resize(df.values, (2000, 4))) # cut the values to make them all the same dimensions, this also gives us less data to work with (for now)
+            csv_filepaths = [y for x in os.walk(test_directory) for y in glob.glob(os.path.join(x[0], '*.csv'))]
+            if (len(csv_filepaths) > 0):
+                df = pd.read_csv(csv_filepaths[0])
+                data.append(np.resize(df.values, (2000, 4))) # cut the values to make them all the same dimensions, this also gives us less data to work with (for now)
+                print("Loaded data from %s." % (csv_filepaths[0]))
+            else:
+                print("No csv files found in %s." % (test_directory))
         data = np.array(data)
         return (data)
 
@@ -37,3 +47,9 @@ class DataReader():
         x = self.get_x_values()
         y = self.get_y_values()
         return ((x, y))
+
+    def save_pickle(self, data):
+        pickle.dump(data, open(os.path.join(self.master_filepath, "data.txt"), 'wb'))
+
+    def get_pickled_data(self):
+        return (pickle.load(open(os.path.join(self.master_filepath, "data.txt"), 'rb')))
