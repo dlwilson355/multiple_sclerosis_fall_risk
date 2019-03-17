@@ -76,7 +76,7 @@ def main(argv):
             Help()
             return
         elif opt == '-g':
-            testDataGenerator = arg
+            testDataGenerator = int(arg)
         elif opt == '-t':
             rnnType = arg
         elif opt == '-d':
@@ -85,6 +85,8 @@ def main(argv):
             numberOfEpochs = int(arg)
         elif opt == '-s':
             stepsInSequence = int(arg)
+            # steps has to be an even number
+            stepsInSequence = int(stepsInSequence) * 2
         elif opt == '-h':
             hiddenUnits = int(arg)
         elif opt == '-v':

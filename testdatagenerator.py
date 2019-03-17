@@ -8,8 +8,6 @@ class TestDataGenerator(keras.utils.Sequence):
         self.len = int(np.ceil(num / float(batchSize)))
         self.num = num
         self.batchSize = batchSize
-        # steps has to be an even number
-        self.steps = int(steps/2) * 2
         return
 
     def GetData(self):
