@@ -2,14 +2,50 @@ import numpy as np
 import tensorflow as tf
 import keras
 from keras.models import Model
-from testdatagenerator import TestDataGenerator
+from keras import backend as K
+#from testdatagenerator import DataGenerator
+from datagenerator import DataGenerator
+
+def Recall(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    all_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    return true_positives / (all_positives + K.epsilon())
+
+def sensitivity(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    return true_positives / (possible_positives + K.epsilon())
+
+def specificity(y_true, y_pred):
+    true_negatives = K.sum(K.round(K.clip((1-y_true) * (1-y_pred), 0, 1)))
+    possible_negatives = K.sum(K.round(K.clip(1-y_true, 0, 1)))
+    return true_negatives / (possible_negatives + K.epsilon())
+
+
+def f1(y_true, y_pred):
+    def recall(y_true, y_pred):
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+        recall = true_positives / (possible_positives + K.epsilon())
+        return recall
+
+    def precision(y_true, y_pred):
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+        precision = true_positives / (predicted_positives + K.epsilon())
+        return precision
+    precision = precision(y_true, y_pred)
+    recall = recall(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall + K.epsilon())) 
+
 
 class RNNRnunner(object):
-    def __init__(self, verb, multi):
+    def __init__(self, verb, multi,folder):
+        self.folder = folder
         self.num_predict=32
-        self.num_features = 1
         self.batch_size = 32
         self.be_verbose = verb
+        self.weightsfile = 'weights.h5'
         if multi:
             self.num_workers = 5
             self.do_multiprocess = True
@@ -17,76 +53,109 @@ class RNNRnunner(object):
             self.num_workers = 0
             self.do_multiprocess = False
 
-    def Compile(self, model, lr=0.001,lossFct='mean_squared_error'):
-        #model.compile(optimizer = keras.optimizers.Adam(clipnorm=1.), loss=lossFct,metrics=['accuracy'])
-        model.compile(optimizer = keras.optimizers.RMSprop(clipnorm=1.), loss=lossFct,metrics=['accuracy'])
+
+    def Compile(self, model,lossFct='mean_squared_error', lr=0.005):
+        #opt = keras.optimizers.Adam(clipnorm=1., lr=lr)
+        #opt = keras.optimizers.Adam(lr=lr)
+        #opt = keras.optimizers.RMSprop(clipnorm=1., lr=lr)
+        opt = keras.optimizers.RMSprop(lr=lr,decay=0.1)
+        #met = [sensitivity, specificity, 'accuracy', f1]
+        met = ['accuracy', sensitivity]
+        model.compile(optimizer = opt, loss=lossFct,metrics=met)
         return
 
-    def Fit(self, model, numTrain, numepoch):
-        trainGen = TestDataGenerator(numTrain, self.batch_size, self.length_of_sequence)
-        valGen = TestDataGenerator(self.num_val, self.batch_size, self.length_of_sequence)
-        hist = model.fit_generator(generator=trainGen, validation_data=valGen, 
+    def Fit(self, model, numTrain, numepoch,data):
+        if None == data:
+            trainGen = DataGenerator(self.folder,'train',numTrain, self.batch_size, self.length_of_sequence)
+            valGen = DataGenerator(self.folder,'validate',self.num_val, self.batch_size, self.length_of_sequence)
+            hist = model.fit_generator(generator=trainGen, validation_data=valGen, 
                             epochs=numepoch, verbose=self.be_verbose, workers=self.num_workers,
                             use_multiprocessing=self.do_multiprocess)
-        print(hist.history)
+        else:
+            hist = model.fit(x=data[0], y=data[1], batch_size=self.batch_size, epochs=numepoch, validation_split=0.5)
+        #print(hist.history)
+        model.save_weights(self.weightsfile)
         return
 
-    def Predict(self, model):
-        print('Predict')
-        preGen = TestDataGenerator(1, 1, self.length_of_sequence)
-        errCount = 0
-        for i in range(self.num_predict):
-            x,y = preGen.GetData()
-            p = model.predict(x)
-            diff = abs(p[0][0]-y[0][0])
-            if diff >= 0.01:
-                print('count {0:d} diff {1:f} expect {2:f} predict {3:f}'.format(errCount,diff,y[0][0],p[0][0]))
-                errCount += 1
-        if errCount == 0:
-            print('no error')
+    def Predict(self, model,data):
+        if None == data:
+            print('Predict')
+            preGen = DataGenerator(self.folder,'predict', 1, 1, self.length_of_sequence)
+            errCount = 0
+            for i in range(self.num_predict):
+                x,y = preGen.GetData(i)
+                p = model.predict(x)
+                diff = abs(p[0][0]-y[0][0])
+                if diff >= 0.01:
+                    print('count {0:d} diff {1:f} expect {2:f} predict {3:f}'.format(errCount,diff,y[0][0],p[0][0]))
+                    errCount += 1
+            if errCount == 0:
+                print('no error')
+        else:
+            print('Predict')
+            #samp = 0
+            #p = model.predict(data[0][samp])
+            #diff = abs(p[0][0]-data[1][samp])
+            #if diff >= 0.01:
+            #    print('count {0:d} diff {1:f} expect {2:f} predict {3:f}'.format(errCount,diff,data[1][samp],p[0][0]))            
         return
 
-    def SimpleRNN(self, numTrain, numEpoch):
+    def SimpleRNN(self, numTrain, numEpoch,actFct):
         model=keras.models.Sequential()
-        model.add(keras.layers.SimpleRNN(units=self.hiddenunits,input_shape=(self.length_of_sequence,1), activation='relu', return_sequences = False))
-        ol = keras.layers.Dense(self.num_features, activation = "sigmoid")
+        model.add(keras.layers.SimpleRNN(units=self.hiddenunits,input_shape=(self.length_of_sequence,self.num_sequences), activation='tanh', return_sequences = False))
+        ol = keras.layers.Dense(self.num_features, activation = actFct)
         model.add(ol)
         return model
 
-    def GRU(self, numTrain, numEpoch):
+    def GRU(self, numTrain, numEpoch,actFct):
         model=keras.models.Sequential()  
-        model.add(keras.layers.GRU(units=self.hiddenunits,input_shape=(self.length_of_sequence,1), activation='relu', return_sequences = False))
-        ol = keras.layers.Dense(self.num_features, activation = "sigmoid")
+        model.add(keras.layers.GRU(units=self.hiddenunits,input_shape=(self.length_of_sequence,self.num_sequences), activation='tanh'))
+        ol = keras.layers.Dense(self.num_features, activation = actFct)
         model.add(ol)
         return model
 
-    def LSTM(self, numTrain, numEpoch):
+    def LSTM(self, numTrain, numEpoch,actFct):
         model=keras.models.Sequential()
-        model.add(keras.layers.LSTM(units=self.hiddenunits,input_shape=(self.length_of_sequence,1), activation='tanh', return_sequences = False))
-        ol = keras.layers.Dense(self.num_features, activation = "sigmoid")
+        model.add(keras.layers.LSTM(units=self.hiddenunits,input_shape=(self.length_of_sequence,self.num_sequences), activation='tanh', return_sequences = False))
+        ol = keras.layers.Dense(self.num_features, activation = actFct)
         model.add(ol)
         return model
 
-    def RunRNN(self, type,numTrain, numEpoch, steps, hiddenunits):
+    def RunRNN(self, type,numTrain, numEpoch, steps, hiddenunits, data):
         print('##################################################################################')
         print('# RunRNN({0:s}, {1:d}, {2:d}, {3:d}, {4:d})                                      #'.format(type,numTrain, numEpoch, steps, hiddenunits))
         print('##################################################################################')
-        self.length_of_sequence = steps
+        if None == data:
+            self.length_of_sequence = steps
+            self.num_sequences = 1
+            self.num_features = 1
+            lossFct='mean_squared_error'
+            actFct = 'sigmoid'
+        else:
+            self.length_of_sequence = data[0].shape[1]
+            self.num_sequences = data[0].shape[2]
+            self.num_features = 1#data[1].shape[1]
+            #lossFct='categorical_crossentropy'
+            #lossFct='binary_crossentropy'
+            lossFct='mean_squared_error'
+            actFct = 'sigmoid'
+            #actFct = 'softmax'
         self.hiddenunits = hiddenunits
         self.num_val = int(numTrain / 10)
         if self.num_val < 1:
             self.num_val = 1
         elif self.num_val > 128:
             self.num_val = 128
+        self.weightsfile = 'weights_' + type + '.h5'
         if 'LSTM'== type:
-            model = self.LSTM(numTrain, numEpoch)
+            model = self.LSTM(numTrain, numEpoch,actFct)
         elif 'GRU' == type:
-            model = self.GRU(numTrain, numEpoch)
+            model = self.GRU(numTrain, numEpoch,actFct)
         else:
-            model = self.SimpleRNN(numTrain, numEpoch)
-        self.Compile(model)
+            model = self.SimpleRNN(numTrain, numEpoch,actFct)
+        self.Compile(model,lossFct)
         #model.summary()
-        self.Fit(model,numTrain, numEpoch)
-        self.Predict(model)
+        self.Fit(model,numTrain, numEpoch,data)
+        self.Predict(model,data)
         return
 

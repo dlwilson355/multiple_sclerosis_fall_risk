@@ -1,14 +1,17 @@
 import numpy as np
 import os
 import keras
-import cv2
+from data_reader import DataReader
 
 class DataGenerator(keras.utils.Sequence):
     def __init__(self, folder, type, num, batchSize, steps):
+        self.master_filepath = folder # the master filepath in which all of the data is located
         self.len = int(np.ceil(num / float(batchSize)))
         self.num = num
         self.batchSize = batchSize
         self.steps = steps
+        reader = DataReader("E:\\MS Fall Study")
+        self.data = reader.get_data(False,True)
         return
 
     def GetData(self,index):
@@ -18,18 +21,13 @@ class DataGenerator(keras.utils.Sequence):
         x = np.ndarray((self.num,self.steps,1))
         y = np.ndarray((self.num,1))
         for i in range(self.num):
-            c = np.random.randint(0,2)
-            if c > 0:
-                t = np.linspace(0.0,0.8,num=self.steps)
-                for s in range(self.steps):
-                    x[i][s] = t[s]
-                y[i] = 1
-            else:
-                v = 0
-                t = [0,1]*int(self.steps/2)
-                for s in range(self.steps):
-                    x[i][s] = t[s]
-                y[i] = 0
+            l = self.data[1].shape[0]
+            c = np.random.randint(0,l)
+            p = index * self.num + i
+            if p > self.data[0].shape[1]-self.steps:
+                p = 0
+            x[i] = self.data[0][c][p:p+self.steps]
+            y[i] = self.data[1][c]
         return x, y
 
     def __len__(self):

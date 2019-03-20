@@ -9,7 +9,7 @@ def create_model():
     model = keras.Sequential()
     # this is a simple MLP I made
     # we will use something more sophisticated (and better suited) like an RNN for the final project
-    model.add(keras.layers.Dense(2000, input_shape=(2000, 4)))
+    model.add(keras.layers.Dense(2000, input_shape=(2000, 3)))
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dropout(0.15))
     model.add(keras.layers.Dense(1000))
@@ -40,15 +40,17 @@ def train_model(model, data):
     model.fit(x=data[0], y=data[1], batch_size=16, epochs=20, validation_split=0.5)
     model.save_weights("weights.h5")
 
-def load_data():
-    reader = DataReader("D:\\deep learning dataset\\MS Fall Study")
-    sample_data = reader.get_pickled_data()
+def load_data(folder, onehot=True, samplesfromz=False):
+    reader = DataReader(folder)
+    #sample_data = reader.get_pickled_data()
+    sample_data = reader.get_data(onehot,samplesfromz)
     return (sample_data)
 
 def Help():
     print('''network.py 
-             -g <use test data generator, def: 0>
-             -t <RNN type: simple, GRU, LSTM, def: simple> 
+             -f <"folder", def: "D:\\deep learning dataset\\MS Fall Study">
+             -t <Network type: MLP, simple, GRU, LSTM, def: MLP> 
+             -g <use data generator, def: 0>
              -d <training data size, def: 320> 
              -e <number of epochs, def: 30> 
              -s <steps in the sequence, def: 6> 
@@ -58,16 +60,17 @@ def Help():
 
 def main(argv):
     # setup options from command line
-    testDataGenerator = False
-    rnnType = 'simple'
+    useDataGenerator = False
+    netType = 'MLP'
     trainingDataSize = 320
     numberOfEpochs = 30
     stepsInSequence = 6 
     hiddenUnits = 75
     verbose = 1
     multiThreaded = 0
+    folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
-        opts, args = getopt.getopt(argv,"?g:t:d:e:s:h:v:m:")
+        opts, args = getopt.getopt(argv,"?f:g:t:d:e:s:h:v:m:")
     except getopt.GetoptError:
         Help()
         return
@@ -75,10 +78,12 @@ def main(argv):
         if opt == '-?':
             Help()
             return
+        elif opt == '-f':
+            folder = arg
         elif opt == '-g':
-            testDataGenerator = int(arg)
+            useDataGenerator = int(arg)
         elif opt == '-t':
-            rnnType = arg
+            netType = arg
         elif opt == '-d':
             trainingDataSize = int(arg)
         elif opt == '-e':
@@ -94,15 +99,21 @@ def main(argv):
         elif opt == '-m':
             multiThreaded = int(arg)
 
-    if testDataGenerator:
-        run = RNNRnunner(verbose,multiThreaded)
-        run.RunRNN(rnnType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits)
-    else:
-        model = create_model()
-        data = load_data()
+    if 'MLP'== netType:
+        data = load_data(folder)
         print(data[0].shape)
         print(data[1].shape)
+        model = create_model()
         train_model(model, data)
+    elif useDataGenerator:
+        run = RNNRnunner(verbose,multiThreaded,folder)
+        run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, None)
+    else:
+        data = load_data(folder,False,True)
+        print(data[0].shape)
+        print(data[1].shape)
+        run = RNNRnunner(verbose,multiThreaded,folder)
+        run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, data)
 
 if __name__ == "__main__":  
     main(sys.argv[1:])
