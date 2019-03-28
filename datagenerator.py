@@ -10,7 +10,7 @@ class DataGenerator(keras.utils.Sequence):
         self.num = num
         self.batchSize = batchSize
         self.steps = steps
-        reader = DataReader("E:\\MS Fall Study")
+        reader = DataReader(self.master_filepath)
         self.data = reader.get_data(False,True)
         return
 
