@@ -12,12 +12,13 @@ def recall(y_true, y_pred):
     return true_positives / (all_positives + K.epsilon())
 
 class RNNRnunner(object):
-    def __init__(self, verb, multi,folder):
+    def __init__(self, verb, multi,folder,numFeatures):
         self.folder = folder
         self.num_predict=32
         self.batch_size = 32
         self.be_verbose = verb
         self.weightsfile = 'weights.h5'
+        self.num_features = numFeatures
         if multi:
             self.num_workers = 5
             self.do_multiprocess = True
@@ -37,8 +38,8 @@ class RNNRnunner(object):
 
     def Fit(self, model, numTrain, numepoch,data):
         if None == data:
-            trainGen = DataGenerator(self.folder,'train',numTrain, self.batch_size, self.length_of_sequence)
-            valGen = DataGenerator(self.folder,'validate',self.num_val, self.batch_size, self.length_of_sequence)
+            trainGen = DataGenerator(self.folder,'train',numTrain, self.batch_size, self.length_of_sequence,self.num_features)
+            valGen = DataGenerator(self.folder,'validate',self.num_val, self.batch_size, self.length_of_sequence,self.num_features)
             hist = model.fit_generator(generator=trainGen, validation_data=valGen, 
                             epochs=numepoch, verbose=self.be_verbose, workers=self.num_workers,
                             use_multiprocessing=self.do_multiprocess)
@@ -51,7 +52,7 @@ class RNNRnunner(object):
     def Predict(self, model,data):
         if None == data:
             print('Predict')
-            preGen = DataGenerator(self.folder,'predict', 1, 1, self.length_of_sequence)
+            preGen = DataGenerator(self.folder,'predict', 1, 1, self.length_of_sequence,self.num_features)
             errCount = 0
             for i in range(self.num_predict):
                 x,y = preGen.GetData(i)
@@ -99,13 +100,11 @@ class RNNRnunner(object):
         if None == data:
             self.length_of_sequence = steps
             self.num_sequences = 1
-            self.num_features = 1
             lossFct='mean_squared_error'
             actFct = 'sigmoid'
         else:
             self.length_of_sequence = data[0].shape[1]
             self.num_sequences = data[0].shape[2]
-            self.num_features = 1#data[1].shape[1]
             #lossFct='categorical_crossentropy'
             #lossFct='binary_crossentropy'
             lossFct='mean_squared_error'

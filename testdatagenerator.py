@@ -4,9 +4,10 @@ import keras
 import cv2
 
 class DataGenerator(keras.utils.Sequence):
-    def __init__(self, folder, type, num, batchSize, steps):
+    def __init__(self, folder, type, num, batchSize, steps,numFeatures):
         self.len = int(np.ceil(num / float(batchSize)))
         self.num = num
+        self.numFeatures = numFeatures
         self.batchSize = batchSize
         self.steps = steps
         return
@@ -16,7 +17,7 @@ class DataGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         x = np.ndarray((self.num,self.steps,1))
-        y = np.ndarray((self.num,1))
+        y = np.ndarray((self.num,self.numFeatures))
         for i in range(self.num):
             c = np.random.randint(0,2)
             if c > 0:

@@ -5,11 +5,11 @@ import sys, getopt
 from recurrentnetwork import RNNRnunner
 import pickle
 
-def create_model():
+def create_model(data):
     model = keras.Sequential()
     # this is a simple MLP I made
     # we will use something more sophisticated (and better suited) like an RNN for the final project
-    model.add(keras.layers.Dense(2000, input_shape=(2000, 3)))
+    model.add(keras.layers.Dense(2000, input_shape=(data[0].shape[1], data[0].shape[2])))
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dropout(0.15))
     model.add(keras.layers.Dense(1000))
@@ -28,7 +28,7 @@ def create_model():
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dropout(0.15))
     model.add(keras.layers.Flatten())
-    model.add(keras.layers.Dense(2))
+    model.add(keras.layers.Dense(data[1].shape[1]))
     model.add(keras.layers.Activation('softmax'))
     opt = keras.optimizers.SGD(lr=0.000000000001)
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
@@ -42,7 +42,6 @@ def train_model(model, data):
 
 def load_data(folder, onehot=True, samplesfromz=False):
     reader = DataReader(folder)
-    #sample_data = reader.get_pickled_data()
     sample_data = reader.get_data(onehot,samplesfromz)
     return (sample_data)
 
@@ -103,16 +102,20 @@ def main(argv):
         data = load_data(folder)
         print(data[0].shape)
         print(data[1].shape)
-        model = create_model()
+        model = create_model(data)
         train_model(model, data)
     elif useDataGenerator:
-        run = RNNRnunner(verbose,multiThreaded,folder)
+        reader = DataReader(folder)
+        numFeatures = reader.NumberOfFeatures()
+        run = RNNRnunner(verbose,multiThreaded,folder,numFeatures)
         run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, None)
     else:
-        data = load_data(folder,False,True)
+        reader = DataReader(folder)
+        data = reader.get_data(True,True)
+        numFeatures = reader.NumberOfFeatures()
         print(data[0].shape)
         print(data[1].shape)
-        run = RNNRnunner(verbose,multiThreaded,folder)
+        run = RNNRnunner(verbose,multiThreaded,folder,numFeatures)
         run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, data)
 
 if __name__ == "__main__":  

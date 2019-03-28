@@ -4,14 +4,15 @@ import keras
 from data_reader import DataReader
 
 class DataGenerator(keras.utils.Sequence):
-    def __init__(self, folder, type, num, batchSize, steps):
+    def __init__(self, folder, type, num, batchSize, steps, numFeatures):
         self.master_filepath = folder # the master filepath in which all of the data is located
         self.len = int(np.ceil(num / float(batchSize)))
         self.num = num
+        self.numFeatures = numFeatures
         self.batchSize = batchSize
         self.steps = steps
         reader = DataReader(self.master_filepath)
-        self.data = reader.get_data(False,True)
+        self.data = reader.get_data(True,True)
         return
 
     def GetData(self,index):
@@ -19,7 +20,7 @@ class DataGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         x = np.ndarray((self.num,self.steps,1))
-        y = np.ndarray((self.num,1))
+        y = np.ndarray((self.num,self.numFeatures))
         for i in range(self.num):
             l = self.data[1].shape[0]
             c = np.random.randint(0,l)

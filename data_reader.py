@@ -9,25 +9,35 @@ from pathlib import Path
 class DataReader():
     def __init__(self, filepath):
         self.master_filepath = filepath # the master filepath in which all of the data is located
-        # set to some small value to test out reading of data
-        # any big value to get all data
-        self.limit = 100
+        file = Path(os.path.join(self.master_filepath, "data.txt"))
+        if file.exists() == True:
+            data = self.get_pickled_data()
+            self.numFeatures = data[1].shape[1]
+        else:
+            self.numFeatures = self.calculateNumberOfFeatures()
+
+    def calculateNumberOfFeatures(self):
+        patients = next(os.walk(self.master_filepath))[1]
+        index = 0 
+        for patient in patients:
+            test_directory = os.path.join(self.master_filepath, patient, "Session_1", "Home", "MC10", "anterior_thigh_right")
+            csv_filepaths = [y for x in os.walk(test_directory) for y in glob.glob(os.path.join(x[0], '*.csv'))]
+            if (len(csv_filepaths) > 0):
+                index += 1
+        return index
+
+    def NumberOfFeatures(self):
+        return self.numFeatures
 
     def get_y_values(self, onehot=True):
-        df = pd.read_csv(os.path.join(self.master_filepath, "SubjectInfo.csv"))
-        df = df['Fall']
-        # set values that don't make sense to not falling
-        for i in range(len(df)):
-            if (df[i] == 'y'):
-                df[i] = 1.0
-            else:
-                df[i] = 0.0
-        df = df.values[:self.limit]
+        data = []
+        for index in range(self.numFeatures):
+            data.append(index)
         if onehot:
-            df = keras.utils.np_utils.to_categorical(df)
+            data = keras.utils.np_utils.to_categorical(data)
         else:
-            df = np.array(df)
-        return (df)
+            data = np.array(data)
+        return (data)
 
     # a function where you can pass the patient test and sensor data you want it will return the corresponding data
     def getData(self, patientNumber, testType, sensorType):
@@ -37,7 +47,6 @@ class DataReader():
     def get_x_values(self):
         data = []
         patients = next(os.walk(self.master_filepath))[1]
-        i = 0
         for patient in patients:
             # for now we just load sensor readings from one test for each patient
             test_directory = os.path.join(self.master_filepath, patient, "Session_1", "Home", "MC10", "anterior_thigh_right")
@@ -50,9 +59,6 @@ class DataReader():
                 print("Loaded data from %s." % (csv_filepaths[0]))
             else:
                 print("No csv files found in %s." % (test_directory))
-            i += 1
-            if i == self.limit:
-                break
         data = np.array(data)
         return (data)
 
@@ -76,9 +82,6 @@ class DataReader():
                 print("Loaded data from %s." % (csv_filepaths[0]))
             else:
                 print("No csv files found in %s." % (test_directory))
-            i += 1
-            if i == self.limit:
-                break
         data = np.array(data)
         return (data)
 
