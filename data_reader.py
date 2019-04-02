@@ -62,6 +62,47 @@ class DataReader():
         data = np.array(data)
         return (data)
 
+    # returns a full matrix of data for a patient corresponding to the timestamps
+    def get_segmented_data(self, segment_size, segments_per_patient):
+        xValues = []
+        yValues = []
+        patients = glob.glob(self.master_filepath + "\\*\\")[0:10]
+        for patient in patients:
+            patient_data = self.get_concatenated_patient_data(patient)
+            one_hot = self.convert_patient_to_one_hot(patient, patients)
+            for i in range(segments_per_patient): # for now get 10 segments
+                xValues.append([patient_data.iloc[i*segment_size: (i+1)*segment_size, ]])
+                yValues.append(one_hot)
+        xData = np.array(xValues)
+        yData = np.array(yValues)
+        return ((xData, yData))
+
+    def convert_patient_to_one_hot(self, patient, patients):
+        one_hot = [0 for i in patients]
+        for i in range(len(patients)):
+            if (patient == patients[i]):
+                one_hot[i] = 1
+        return (one_hot)
+    
+    # now I realize that we probabaly don't need this but I will leave it for now
+    def determine_if_patient_fell(self, patient_filepath):
+        subject_info = pd.read_csv(os.path.join(self.master_filepath, "SubjectInfo.csv"))
+        patient = os.path.basename(os.path.dirname(patient_filepath))
+        print(subject_info.loc[subject_info['patient'] == patient])
+
+    def get_concatenated_patient_data(self, patient_filepath):
+        csv_filepaths = [y for x in os.walk(patient_filepath) for y in glob.glob(os.path.join(x[0], '*.csv'))]
+        dataframes = []
+        for filepath in csv_filepaths:
+            # make sure the file type is correct
+            if ('accel' in filepath or 'gyro' in filepath or 'elec' in filepath):
+                filename = os.path.basename(filepath)
+                df = pd.read_csv(filepath)
+                df = df.drop(df.columns[0], axis=1)
+                dataframes.append(df)
+        result = pd.concat(dataframes, axis=1)
+        return (result)
+
     def get_x_samplesfromz(self):
         data = []
         patients = next(os.walk(self.master_filepath))[1]
