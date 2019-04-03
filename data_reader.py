@@ -66,16 +66,30 @@ class DataReader():
     def get_segmented_data(self, segment_size, segments_per_patient):
         xValues = []
         yValues = []
-        patients = glob.glob(self.master_filepath + "\\*\\")[0:10]
+        patients = glob.glob(self.master_filepath + "\\*\\")
+        print("all patients")
+        print(patients)
+        patients = self.get_session1_lab_data_directory(patients)
+        print("lab data directories")
+        print(patients)
+        patients = self.remove_patients_with_incomplete_data(patients)
+        print("patients with no missing data")
+        print(patients)
         for patient in patients:
             patient_data = self.get_concatenated_patient_data(patient)
             one_hot = self.convert_patient_to_one_hot(patient, patients)
-            for i in range(segments_per_patient): # for now get 10 segments
-                xValues.append([patient_data.iloc[i*segment_size: (i+1)*segment_size, ]])
+            for i in range(segments_per_patient):
+                xValues.append(patient_data.iloc[i*segment_size: (i+1)*segment_size, ].values)
                 yValues.append(one_hot)
         xData = np.array(xValues)
         yData = np.array(yValues)
         return ((xData, yData))
+
+    def get_session1_lab_data_directory(self, patient_directories):
+        directories = []
+        for patient_directory in patient_directories:
+            directories.append(os.path.join(patient_directory, "Session_1", "Lab", "MC10"))
+        return (directories)
 
     def convert_patient_to_one_hot(self, patient, patients):
         one_hot = [0 for i in patients]
@@ -90,13 +104,24 @@ class DataReader():
         patient = os.path.basename(os.path.dirname(patient_filepath))
         print(subject_info.loc[subject_info['patient'] == patient])
 
+    # returns a list of patients that no longer contains patients with incomplete data
+    def remove_patients_with_incomplete_data(self, patient_list):
+        trimmed_patient_list = []
+        for patient in patient_list:
+            if (self.has_complete_lab_data(patient)):
+                trimmed_patient_list.append(patient)
+        return (trimmed_patient_list)
+
+    def has_complete_lab_data(self, patient_filepath):
+        return (len([y for x in os.walk(patient_filepath) for y in glob.glob(os.path.join(x[0], '*.csv'))]) == 21)
+
     def get_concatenated_patient_data(self, patient_filepath):
         csv_filepaths = [y for x in os.walk(patient_filepath) for y in glob.glob(os.path.join(x[0], '*.csv'))]
+        print("Loading data for %s" % (patient_filepath))
         dataframes = []
         for filepath in csv_filepaths:
             # make sure the file type is correct
             if ('accel' in filepath or 'gyro' in filepath or 'elec' in filepath):
-                filename = os.path.basename(filepath)
                 df = pd.read_csv(filepath)
                 df = df.drop(df.columns[0], axis=1)
                 dataframes.append(df)
@@ -106,7 +131,6 @@ class DataReader():
     def get_x_samplesfromz(self):
         data = []
         patients = next(os.walk(self.master_filepath))[1]
-        i = 0
         for patient in patients:
             # for now we just load sensor readings from one test for each patient
             test_directory = os.path.join(self.master_filepath, patient, "Session_1", "Home", "MC10", "anterior_thigh_right")
