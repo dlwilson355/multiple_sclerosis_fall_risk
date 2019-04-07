@@ -4,13 +4,22 @@ import numpy as np
 
 def create_model(x_data, y_data):
     model = keras.Sequential()
-    model.add(keras.layers.Conv2D(100, input_shape=(x_data.shape[1], x_data.shape[2], 1), kernel_size=(10, 10)))
+
+    # first convolutional layer
+    model.add(keras.layers.Conv2D(100, input_shape=(x_data.shape[1], x_data.shape[2], 1), kernel_size=(10, 1), use_bias=False))
+    model.add(keras.layers.BatchNormalization())
     model.add(keras.layers.Activation('relu'))
+
+    # second convolutional layer
     model.add(keras.layers.Conv2D(100, kernel_size=(3, 3)))
     model.add(keras.layers.Activation('relu'))
+
+    # softmax layer
     model.add(keras.layers.Flatten())
     model.add(keras.layers.Dense(y_data.shape[1]))
     model.add(keras.layers.Activation('softmax'))
+
+
     opt = keras.optimizers.SGD(lr=0.001)
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
     print(model.summary())
@@ -76,7 +85,7 @@ def train_model(model, x_data, y_data):
     model.save_weights("weights.h5")
 
 def load_data():
-    MASTER_FILEPATH = ""#"D:\\deep learning dataset\\MS Fall Study" # replace this with your filepath to the "MS Fall Study" directory
+    MASTER_FILEPATH = "D:\\deep learning dataset\\MS Fall Study" # replace this with your filepath to the "MS Fall Study" directory
     SEGMENT_SIZE = 50 # this variable represents the number of sequential data measurements that are part of each "segment" of x data
     SEGMENTS_PER_PATIENT = 300 # this variable represents the number of segments to get from each patient
 
