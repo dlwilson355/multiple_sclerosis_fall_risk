@@ -5,13 +5,13 @@ import glob
 import pickle
 import keras
 from pathlib import Path
+import tensorflow as tf
 
 class DataReader():
     def __init__(self, filepath):
         self.master_filepath = filepath # the master filepath in which all of the data is located
-        file = Path(os.path.join(self.master_filepath, "data.txt"))
-        if file.exists() == True:
-            data = self.get_pickled_data()
+        data = self.get_pickled_data("data.txt")
+        if data != None:
             self.numFeatures = data[1].shape[1]
         else:
             self.numFeatures = self.calculateNumberOfFeatures()
@@ -64,6 +64,9 @@ class DataReader():
 
     # returns a full matrix of data for a patient corresponding to the timestamps
     def get_segmented_data(self, segment_size, segments_per_patient):
+        data = self.get_pickled_data("data.seg")
+        if data != None:
+            return data
         xValues = []
         yValues = []
         patients = glob.glob(self.master_filepath + "\\*\\")
@@ -75,15 +78,27 @@ class DataReader():
         patients = self.remove_patients_with_incomplete_data(patients)
         print("patients with no missing data")
         print(patients)
+        segment_window = int(segment_size /100)
+        if segment_window == 0:
+            segment_window = 1
         for patient in patients:
             patient_data = self.get_concatenated_patient_data(patient)
             one_hot = self.convert_patient_to_one_hot(patient, patients)
             for i in range(segments_per_patient):
-                xValues.append(patient_data.iloc[i*segment_size: (i+1)*segment_size, ].values)
-                yValues.append(one_hot)
+                start = i*segment_window
+                end = start + segment_size
+                if end < len(patient_data):
+                    xData1 = patient_data.iloc[start: end, ].values
+                    xData = tf.keras.utils.normalize(xData1, axis=-1)
+                    xValues.append(xData)
+                    yValues.append(one_hot)
+                else:
+                    print(patient, 'out of range', end)
         xData = np.array(xValues)
         yData = np.array(yValues)
-        return ((xData, yData))
+        data = ((xData, yData))
+        self.save_pickle(data,"data.seg")
+        return data
 
     def get_session1_lab_data_directory(self, patient_directories):
         directories = []
@@ -151,20 +166,74 @@ class DataReader():
         return (data)
 
     def get_data(self,onehot=True, samplesfromz=False):
-        file = Path(os.path.join(self.master_filepath, "data.txt"))
-        if file.exists() == True:
-            return self.get_pickled_data()
+        data = self.get_pickled_data("data.txt")
+        if data != None:
+            return data
         y = self.get_y_values(onehot)
         if samplesfromz:
             x = self.get_x_samplesfromz()
         else:
             x = self.get_x_values()
         data = ((x, y))
-        self.save_pickle(data)
+        self.save_pickle(data,"data.txt")
         return data
 
-    def save_pickle(self, data):
-        pickle.dump(data, open(os.path.join(self.master_filepath, "data.txt"), 'wb'))
+    def get_tsdata(self):
+        data = self.get_pickled_data("data.ts")
+        if data != None:
+            return data
+        tsfile = Path(os.path.join(self.master_filepath, "timestamps.csv"))
+        if tsfile.exists() == False:
+            print('Missing', tsfile)
+            # force an exception
+            return 0
+        print('reading patient data using timestamps')
+        tslist = pd.read_csv(tsfile)
+        tsData = np.array(tslist)
+        xValues = []
+        yValues = []
+        patients = next(os.walk(self.master_filepath))[1]
+        for patient in patients:
+            print(patient)
+            test_directory = os.path.join(self.master_filepath, patient, "Session_1", "Home", "MC10", "anterior_thigh_right")
+            csv_filepaths = [y for x in os.walk(test_directory) for y in glob.glob(os.path.join(x[0], '*.csv'))]
+            if (len(csv_filepaths) > 0):
+                one_hot = self.convert_patient_to_one_hot(patient, patients)
+                df = pd.read_csv(csv_filepaths[0])
+                first = df.iloc[0][0]
+                stepsize = df.iloc[1][0] - first
+                if stepsize > 1000:
+                    factor = 1000000 / stepsize
+                else:
+                    factor = 1000 / stepsize
+                df = df.drop(df.columns[0], axis=1)#ts
+                print(patient, 'factor', factor)
+                for ts in tsData:
+                    if ts[0] == patient:
+                        # read in 250 counts starting at row = ts[1] * 62.25
+                        start = int(ts[1]*factor)
+                        #print(ts, 'index',start,'len',len(df))
+                        if start+250 < len(df): 
+                            xValues.append(df[start:start+250].values)
+                            yValues.append(one_hot)
+                        else:
+                            print(ts, 'index',start,'len',len(df))
+        xData = np.array(xValues)
+        yData = np.array(yValues)
+        data = ((xData, yData))
+        self.save_pickle(data, "data.ts")
+        return data
 
-    def get_pickled_data(self):
-        return (pickle.load(open(os.path.join(self.master_filepath, "data.txt"), 'rb')))
+
+    def save_pickle(self, data, filename):
+        file = Path(os.path.join(self.master_filepath, filename))
+        print('save',file)
+        pickle.dump(data, open(file, 'wb'))
+
+    def get_pickled_data(self, filename):
+        file = Path(os.path.join(self.master_filepath, filename))
+        if file.exists() == True:
+            print('load',file)
+            return (pickle.load(open(file, 'rb')))
+        return None
+

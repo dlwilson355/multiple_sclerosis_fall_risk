@@ -4,7 +4,9 @@ import keras
 from keras.models import Model
 from keras import backend as K
 #from testdatagenerator import DataGenerator
-from datagenerator import DataGenerator
+#from datagenerator import DataGenerator
+#from segmentdatagenerator import DataGenerator
+from tsdatagenerator import DataGenerator
 
 def recall(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
@@ -14,7 +16,7 @@ def recall(y_true, y_pred):
 class RNNRnunner(object):
     def __init__(self, verb, multi,folder,numFeatures):
         self.folder = folder
-        self.num_predict=32
+        self.num_predict=100
         self.batch_size = 32
         self.be_verbose = verb
         self.weightsfile = 'weights.h5'
@@ -49,17 +51,30 @@ class RNNRnunner(object):
         model.save_weights(self.weightsfile)
         return
 
+    def getY(self, y):
+        i = 0
+        max = 0
+        index = 0
+        for n in y:
+            if n > max:
+                index = i
+                max = n
+            #print(n)
+            i += 1
+        return index
+
     def Predict(self, model,data):
         if None == data:
             print('Predict')
             preGen = DataGenerator(self.folder,'predict', 1, 1, self.length_of_sequence,self.num_features)
             errCount = 0
             for i in range(self.num_predict):
-                x,y = preGen.GetData(i)
-                p = model.predict(x)
-                diff = abs(p[0][0]-y[0][0])
-                if diff >= 0.01:
-                    print('count {0:d} diff {1:f} expect {2:f} predict {3:f}'.format(errCount,diff,y[0][0],p[0][0]))
+                x,y1h = preGen.GetData(i)
+                p1h = model.predict(x)
+                y = int(self.getY(y1h[0]))
+                p = int(self.getY(p1h[0]))
+                if p != y:
+                    print('count {0:d} expect {1:d} predict {2:d}'.format(errCount,y,p))
                     errCount += 1
             if errCount == 0:
                 print('no error')
@@ -99,7 +114,7 @@ class RNNRnunner(object):
         print('##################################################################################')
         if None == data:
             self.length_of_sequence = steps
-            self.num_sequences = 1
+            self.num_sequences = 3
             lossFct='mean_squared_error'
             actFct = 'sigmoid'
         else:
@@ -111,11 +126,9 @@ class RNNRnunner(object):
             actFct = 'sigmoid'
             #actFct = 'softmax'
         self.hiddenunits = hiddenunits
-        self.num_val = int(numTrain / 10)
+        self.num_val = int(numTrain * 0.6)
         if self.num_val < 1:
             self.num_val = 1
-        elif self.num_val > 128:
-            self.num_val = 128
         self.weightsfile = 'weights_' + type + '.h5'
         if 'LSTM'== type:
             model = self.LSTM(numTrain, numEpoch,actFct)
