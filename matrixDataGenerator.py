@@ -83,7 +83,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
         return (result)
 
     def get_patient_list(self):
-        patients = glob.glob(self.master_directory + "\\*\\")
+        patients = glob.glob(os.path.join(self.master_directory, "*", ""))
         self.print_if_debug("all patients")
         self.print_if_debug(patients)
         patients = self.get_session1_lab_data_directory(patients)
@@ -159,17 +159,25 @@ class MatrixDataGenerator(keras.utils.Sequence):
         timestamp_filepath = [y for x in os.walk(patient_filepath) for y in glob.glob(os.path.join(x[0], 'accel.csv'))][0]
         self.print_if_debug("Checking %s" % (timestamp_filepath))
         df = pd.read_csv(timestamp_filepath)
+        adjustment_rate = self.get_average_ms_between_samples(df)
         current_index = 0
         current_timestamp = self.convert_to_milliseconds(df.iloc[current_index, 0])
-        while (abs(timestamp - current_timestamp) > 8):
+        while (abs(timestamp - current_timestamp) > adjustment_rate):
             difference = timestamp - current_timestamp
-            current_index += int(difference/8)
+            current_index += int(difference/adjustment_rate)
             current_timestamp = self.convert_to_milliseconds(df.iloc[current_index, 0])
         return (current_index)
 
+    # returns the average milliseconds between samples
+    def get_average_ms_between_samples(self, df):
+        sample_1 = self.convert_to_milliseconds(df.iloc[0, 0])
+        sample_2 = self.convert_to_milliseconds(df.iloc[1000, 0])
+        average_ms_between_samples = (sample_2 - sample_1) / 1000
+        return (average_ms_between_samples)
+
     # if the passed timestamp is in microseconds, converts it to milliseconds
     def convert_to_milliseconds(self, timestamp):
-        if (len(str(timestamp)) == 16):
+        if (len(str(timestamp)) >= 16):
             return (int(timestamp/1000 + .5))
         return (timestamp)
 
