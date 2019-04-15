@@ -18,7 +18,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.print_loading_progress = print_loading_progress
         self.debug = debug
         self.patients = self.get_patient_list()
-        self.len = int(np.floor(len(self.patients) / self.batch_size))
+        self.len = int(np.floor(len(self.patients) / self.batch_size)) + 1
         if (preload_concatenated_dataframes):
             self.preloaded_concatenated_dataframes = self.preload_concatenated_dataframes()
         else:
