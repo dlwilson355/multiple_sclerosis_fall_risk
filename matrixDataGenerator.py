@@ -8,99 +8,23 @@ import random
 from skimage.transform import resize
 from skimage.color import gray2rgb
 
-class MatrixDataGenerator(keras.utils.Sequence):
-    def __init__(self, directory, matrix_dimensions = "NONE", rgb = False, batch_size=32, grab_data_from = (0, .75), preload_concatenated_dataframes = True, preload_activity_start_and_end_indicies = True, print_loading_progress = False, debug = False):
+class MatrixPreLoader(object):
+    def __init__(self, directory, print_loading_progress = False, debug = False):
         self.master_directory = directory
-        self.matrix_dimensions = matrix_dimensions
-        self.rgb = rgb
-        self.batch_size = batch_size
-        self.valid_selection_range = grab_data_from
         self.print_loading_progress = print_loading_progress
         self.debug = debug
         self.patients = self.get_patient_list()
-        self.len = int(np.floor(len(self.patients) / self.batch_size)) + 1
-        if (preload_concatenated_dataframes):
-            self.preloaded_concatenated_dataframes = self.preload_concatenated_dataframes()
-        else:
-            self.preloaded_concatenated_dataframes = None
-        if (self.preload_activity_start_and_end_indicies):
-            self.preloaded_activity_start_and_end_indicies = None
-        else:
-            self.preloaded_activity_start_and_end_indicies = self.preload_activity_start_and_end_indicies()
+        self.preloaded_concatenated_dataframes = self.preload_concatenated_dataframes()
+        self.preloaded_activity_start_and_end_indicies = self.preload_activity_start_and_end_indicies()
 
-    def __len__(self):
-        'Denotes the number of batches per epoch'
-        return self.len
+    def Get_patients(self):
+        return self.patients
 
-    def __getitem__(self, index=0):
-        'Generate one batch of data'
-        patient_indexes = [random.randint(0, len(self.patients)-1) for i in range(self.batch_size)]
+    def Get_concatenated_dataframes(self):
+        return self.preloaded_concatenated_dataframes
 
-        # Find list of IDs
-        patients_selected = [self.patients[k] for k in patient_indexes]
-
-        # Generate data
-        X, y = self.data_generation(patients_selected)
-
-        self.print_if_debug("X batch shape: %s" % (X.shape, ))
-        self.print_if_debug("y batch shape: %s" % (y.shape, ))
-
-        return X, y
-
-    def data_generation(self, patients):
-        xValues = []
-        yValues = []
-
-        self.print_if_loading("Generating batch of data with patients: %s" % (patients))
-        for i, patient in enumerate(patients):
-            self.print_if_loading("Loading patient %d of %d" % (i, len(patients)))
-            self.print_if_debug("Generating data for %s" % (patient))
-            xData = self.generate_patient_data(patient).values
-            xData = tf.keras.utils.normalize(xData, axis=-1)
-            if (not self.matrix_dimensions == "NONE"):
-                xData = resize(xData, self.matrix_dimensions)
-            if (self.rgb):
-                xData = gray2rgb(xData)
-                self.print_if_debug("xData shape after rgb conversion: %s" % (xData.shape,))
-            else:
-                xData = xData.reshape((xData.shape[0], xData.shape[1], 1))
-                self.print_if_debug("xData shape after reshaping: %s" % (xData.shape,))
-            yData = self.convert_patient_to_one_hot(patient)
-            self.print_if_debug("yData shape: %s" % (yData.shape,))
-            xValues.append(xData)
-            yValues.append(yData)
-        xData = np.array(xValues)
-        yData = np.array(yValues)
-        return xData, yData
-
-    def generate_patient_data(self, patient):
-        self.print_if_debug("Generating data for %s" % (patient))
-        if (self.preloaded_activity_start_and_end_indicies == None):
-            (starts, ends) = self.get_test_start_and_end_indicies(patient)
-        else:
-            (starts, ends) = self.preloaded_activity_start_and_end_indicies[patient]
-        if (self.preloaded_concatenated_dataframes == None):
-            patient_data = self.get_concatenated_patient_data(patient)
-        else:
-            patient_data = self.preloaded_concatenated_dataframes[patient]
-        dimension = patient_data.shape[1] * len(starts) # this dimension represents both the length and width of the dataframe
-        dataframes = []
-        final = pd.DataFrame()
-        for i in range(len(starts)):
-            start = starts[i]
-            end = ends[i]
-            self.print_if_debug("Window range from index %d to %d." % (start, end))
-            difference = end - start
-            valid_start_range = (int(start + difference * self.valid_selection_range[0]), int(start + difference * self.valid_selection_range[1] - dimension))
-            if (valid_start_range[1] <= valid_start_range[0]): # need to find a better solution for this, this is necessary if the activity is too short to have a valid range
-                valid_start_range = (valid_start_range[0], valid_start_range[0]+1)
-            start_index = random.randint(valid_start_range[0], valid_start_range[1]-1)
-            end_index = start_index + dimension
-            self.print_if_debug("Selected window starts from index %d to %d." % (start_index, end_index))
-            df = pd.DataFrame(patient_data.iloc[start_index:end_index, ].values)
-            dataframes.append(df)
-        result = pd.concat(dataframes, axis=1, ignore_index=True)
-        return (result)
+    def Get_activity_start_and_end_indicies(self):
+        return self.preloaded_activity_start_and_end_indicies
 
     def get_patient_list(self):
         patients = glob.glob(os.path.join(self.master_directory, "*", ""))
@@ -139,14 +63,6 @@ class MatrixDataGenerator(keras.utils.Sequence):
         for patient_directory in patient_directories:
             directories.append(os.path.join(patient_directory, "Session_1", "Lab", "MC10"))
         return (directories)
-
-    # takes the patient's directory and the directories of all the patients as arguments and returns the one hot encoding corresponding to that patient
-    def convert_patient_to_one_hot(self, patient):
-        one_hot = [0 for i in self.patients]
-        for i in range(len(self.patients)):
-            if (patient == self.patients[i]):
-                one_hot[i] = 1
-        return (np.array(one_hot))
 
     # returns a list of patients that no longer contains patients with incomplete data
     def remove_patients_with_incomplete_data(self, patient_list):
@@ -218,6 +134,107 @@ class MatrixDataGenerator(keras.utils.Sequence):
             start_end_indicies[patient] = self.get_test_start_and_end_indicies(patient)
         self.print_if_loading("Preloaded activity start and end indicies.")
         return (start_end_indicies)
+
+    # prints out the statement if printing out loading progress (to track perfomance)
+    def print_if_loading(self, string):
+        if (self.print_loading_progress):
+            print(string)
+
+    # prints out the statement if dubugging
+    def print_if_debug(self, string):
+        if (self.debug):
+            print(string)
+
+class MatrixDataGenerator(keras.utils.Sequence):
+    def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, batch_size=32, grab_data_from = (0, .75), print_loading_progress = False, debug = False):
+        self.matrix_dimensions = matrix_dimensions
+        self.rgb = rgb
+        self.twoD = twoD
+        self.batch_size = batch_size
+        self.valid_selection_range = grab_data_from
+        self.print_loading_progress = print_loading_progress
+        self.debug = debug
+        self.preLoader = preLoader
+        self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
+
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        return self.len
+
+    def __getitem__(self, index=0):
+        'Generate one batch of data'
+        patient_indexes = [random.randint(0, len(self.preLoader.Get_patients())-1) for i in range(self.batch_size)]
+
+        # Find list of IDs
+        patients_selected = [self.preLoader.Get_patients()[k] for k in patient_indexes]
+
+        # Generate data
+        X, y = self.data_generation(patients_selected)
+
+        self.print_if_debug("X batch shape: %s" % (X.shape, ))
+        self.print_if_debug("y batch shape: %s" % (y.shape, ))
+
+        return X, y
+
+    def data_generation(self, patients):
+        xValues = []
+        yValues = []
+
+        self.print_if_loading("Generating batch of data with patients: %s" % (patients))
+        for i, patient in enumerate(patients):
+            self.print_if_loading("Loading patient %d of %d" % (i, len(patients)))
+            self.print_if_debug("Generating data for %s" % (patient))
+            xData = self.generate_patient_data(patient).values
+            xData = tf.keras.utils.normalize(xData, axis=-1)
+            if (not self.matrix_dimensions == "NONE"):
+                xData = resize(xData, self.matrix_dimensions)
+            if (self.rgb):
+                xData = gray2rgb(xData)
+                self.print_if_debug("xData shape after rgb conversion: %s" % (xData.shape,))
+            elif (self.twoD):
+                xData = xData.reshape((xData.shape[0], xData.shape[1]))
+                self.print_if_debug("xData shape after reshaping as 2D: %s" % (xData.shape,))
+            else:
+                xData = xData.reshape((xData.shape[0], xData.shape[1],1))
+                self.print_if_debug("xData shape after reshaping as gray 3D: %s" % (xData.shape,))
+            yData = self.convert_patient_to_one_hot(patient)
+            self.print_if_debug("yData shape: %s" % (yData.shape,))
+            xValues.append(xData)
+            yValues.append(yData)
+        xData = np.array(xValues)
+        yData = np.array(yValues)
+        return xData, yData
+
+    def generate_patient_data(self, patient):
+        self.print_if_debug("Generating data for %s" % (patient))
+        (starts, ends) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
+        patient_data = self.preLoader.Get_concatenated_dataframes()[patient]
+        dimension = patient_data.shape[1] * len(starts) # this dimension represents both the length and width of the dataframe
+        dataframes = []
+        final = pd.DataFrame()
+        for i in range(len(starts)):
+            start = starts[i]
+            end = ends[i]
+            self.print_if_debug("Window range from index %d to %d." % (start, end))
+            difference = end - start
+            valid_start_range = (int(start + difference * self.valid_selection_range[0]), int(start + difference * self.valid_selection_range[1] - dimension))
+            if (valid_start_range[1] <= valid_start_range[0]): # need to find a better solution for this, this is necessary if the activity is too short to have a valid range
+                valid_start_range = (valid_start_range[0], valid_start_range[0]+1)
+            start_index = random.randint(valid_start_range[0], valid_start_range[1]-1)
+            end_index = start_index + dimension
+            self.print_if_debug("Selected window starts from index %d to %d." % (start_index, end_index))
+            df = pd.DataFrame(patient_data.iloc[start_index:end_index, ].values)
+            dataframes.append(df)
+        result = pd.concat(dataframes, axis=1, ignore_index=True)
+        return (result)
+
+    # takes the patient's directory and the directories of all the patients as arguments and returns the one hot encoding corresponding to that patient
+    def convert_patient_to_one_hot(self, patient):
+        one_hot = [0 for i in self.preLoader.Get_patients()]
+        for i in range(len(self.preLoader.Get_patients())):
+            if (patient == self.preLoader.Get_patients()[i]):
+                one_hot[i] = 1
+        return (np.array(one_hot))
 
     # prints out the statement if printing out loading progress (to track perfomance)
     def print_if_loading(self, string):

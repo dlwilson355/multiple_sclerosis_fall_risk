@@ -4,12 +4,13 @@ import os
 import sys, getopt
 from recurrentnetwork import RNNRnunner
 import pickle
-from convolutionalNetwork import ConvNetwork, MLPNetwork, Res50Network
+from convolutionalNetwork import ConvNetwork, MLPNetwork
+from matrixDataGenerator import MatrixDataGenerator
 
 def Help():
     print('''network.py 
              -f <"folder", def: "D:\\deep learning dataset\\MS Fall Study">
-             -t <Network type: MLP, CNN, ResNet, simple, GRU, LSTM, def: MLP> 
+             -t <Network type: MLP, CNN, ResNet, NASNet, simple, GRU, LSTM, def: MLP> 
              -g <use data generator, def: 0>
              -d <training data size, def: 320> 
              -e <number of epochs, def: 30> 
@@ -65,13 +66,8 @@ def main(argv):
     elif 'CNN'== netType:
         convNet = ConvNetwork(folder, stepsInSequence,trainingDataSize, numberOfEpochs)
         convNet.run()
-    elif 'ResNet'== netType:
-        r50Net = Res50Network(folder, stepsInSequence,trainingDataSize, numberOfEpochs)
-        r50Net.run()
     elif useDataGenerator:
-        reader = DataReader(folder)
-        numFeatures = reader.NumberOfFeatures()
-        run = RNNRnunner(verbose,multiThreaded,folder,numFeatures)
+        run = RNNRnunner(verbose,multiThreaded,folder,0)
         run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, None)
     else:
         reader = DataReader(folder)
