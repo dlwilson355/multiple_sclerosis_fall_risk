@@ -1,4 +1,5 @@
 from keras.applications.resnet50 import ResNet50
+from keras.applications.vgg16 import VGG16
 from matrixDataGenerator import MatrixDataGenerator
 
 data_filepath = "D:\\deep learning dataset\\MS Fall Study" # you will obviously need to change this to the appropriate filepath based on where you placed the data folder
@@ -11,7 +12,7 @@ def create_generators():
 
 def train_model_with_generator(model, training_generator, validation_generator):
     model.compile(optimizer='rmsprop', loss='categorical_crossentropy')
-    model.fit_generator(training_generator, epochs=10, steps_per_epoch=2, validation_data = validation_generator)
+    model.fit_generator(training_generator, epochs=10, steps_per_epoch=20, validation_steps=10, validation_data = validation_generator)
     model.save_weights("resNet_weights.h5")
 
 def main():
