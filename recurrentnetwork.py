@@ -181,7 +181,7 @@ class RNNRnunner(object):
                 self.num_features = sample_Y.shape[1]
                 self.length_of_sequence = sample_X.shape[1]
                 self.num_sequences = sample_X.shape[2]
-                if self.gray == False:
+                if self.twoD == False:
                     self.depth = sample_X.shape[3]
                 else:
                     self.depth = 0
