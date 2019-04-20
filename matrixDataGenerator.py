@@ -9,11 +9,11 @@ from skimage.transform import resize
 from skimage.color import gray2rgb
 
 class MatrixPreLoader(object):
-    def __init__(self, directory, print_loading_progress = False, debug = False):
+    def __init__(self, directory, num_patients_to_use = "ALL", print_loading_progress = False, debug = False):
         self.master_directory = directory
         self.print_loading_progress = print_loading_progress
         self.debug = debug
-        self.patients = self.get_patient_list()
+        self.patients = self.get_patient_list(num_patients_to_use)
         self.preloaded_concatenated_dataframes = self.preload_concatenated_dataframes()
         self.preloaded_activity_start_and_end_indicies = self.preload_activity_start_and_end_indicies()
 
@@ -26,16 +26,21 @@ class MatrixPreLoader(object):
     def Get_activity_start_and_end_indicies(self):
         return self.preloaded_activity_start_and_end_indicies
 
-    def get_patient_list(self):
+    def get_patient_list(self, num_patients):
         patients = glob.glob(os.path.join(self.master_directory, "*", ""))
-        self.print_if_debug("all patients")
+        self.print_if_debug("Found %d patients, listed below." % (len(patients)))
         self.print_if_debug(patients)
         patients = self.get_session1_lab_data_directory(patients)
-        self.print_if_debug("lab data directories")
+        self.print_if_debug("Corresponding lab data directories listed below.")
         self.print_if_debug(patients)
         patients = self.remove_patients_with_incomplete_data(patients)
-        self.print_if_debug("patients with no missing data")
+        self.print_if_debug("Found %d patients with no missing data, listed below." % (len(patients)))
         self.print_if_debug(patients)
+        if (not num_patients == "ALL"):
+            self.print_if_debug("Removing %d patients." % (len(patients)-num_patients))
+            patients = patients[0:num_patients]
+            self.print_if_debug("Using %d patients for training.  Listed below." % (len(patients)))
+            self.print_if_debug(patients)
         return (patients)
 
     # returns the test start and end timestamps from the corresponding patient directory
@@ -80,8 +85,7 @@ class MatrixPreLoader(object):
         dataframes = []
         for filepath in csv_filepaths:
             self.print_if_debug("Loading %s" % (filepath))
-            # make sure the file type is correct
-            if ('accel' in filepath or 'gyro' in filepath or 'elec' in filepath):
+            if ('accel.csv' in filepath or 'gyro.csv' in filepath or 'elec.csv' in filepath): # make sure the file type is correct
                 df = pd.read_csv(filepath)
                 df = df.drop(df.columns[0], axis=1)
                 dataframes.append(df)
@@ -90,7 +94,12 @@ class MatrixPreLoader(object):
 
     # returns a boolean representing if the data from the lab tests at the passed directory contains a complete set of sensor readings
     def has_complete_lab_data(self, data_filepath):
-        return (len([y for x in os.walk(data_filepath) for y in glob.glob(os.path.join(x[0], '*.csv'))]) == 21)
+        csv_filepaths = [y for x in os.walk(data_filepath) for y in glob.glob(os.path.join(x[0], '*.csv'))]
+        valid_csv_filepaths = 0
+        for csv_filepath in csv_filepaths: # only count files with valid names
+            if ("accel.csv" in csv_filepath or "gyro.csv" in csv_filepath or "elec.csv" in csv_filepath or "annotations.csv" in csv_filepath):
+                valid_csv_filepaths += 1
+        return (valid_csv_filepaths == 21)
 
     # returns the index of the sensor data corresponding to the passed timestamp
     def get_corresponding_index(self, patient_filepath, timestamp):
