@@ -87,10 +87,24 @@ class MatrixPreLoader(object):
             self.print_if_debug("Loading %s" % (filepath))
             if ('accel.csv' in filepath or 'gyro.csv' in filepath or 'elec.csv' in filepath): # make sure the file type is correct
                 df = pd.read_csv(filepath)
-                df = df.drop(df.columns[0], axis=1)
-                dataframes.append(df)
-        result = pd.concat(dataframes, axis=1)
+                df = self.interpolate(df)
+                #df = df.drop(df.columns[0], axis=1)
+                dataframes.append(pd.DataFrame(df.values))
+        result = pd.concat(dataframes, axis=1, ignore_index=True)
         return (result)
+
+    # interpolates the dataframe such that all have measurements taken every 8 ms
+    def interpolate(self, df):
+        df.rename(columns={ df.columns[0]: "date" }, inplace=True)
+        df['datetime'] = pd.to_datetime(df['date'])
+        if (self.is_milliseconds(df.iloc[1, 0])):
+            df['datetime'] = pd.to_datetime(df['date'], unit="ms")
+        else:
+            df['datetime'] = pd.to_datetime(df['date'], unit="us")
+        df = df.set_index('datetime')
+        df.drop(['date'], axis=1, inplace=True)
+        df = df.resample('8ms').pad()
+        return (df)
 
     # returns a boolean representing if the data from the lab tests at the passed directory contains a complete set of sensor readings
     def has_complete_lab_data(self, data_filepath):
@@ -122,9 +136,12 @@ class MatrixPreLoader(object):
         average_ms_between_samples = (sample_2 - sample_1) / 1000
         return (average_ms_between_samples)
 
+    def is_milliseconds(self, timestamp):
+        return (not (len(str(timestamp)) >= 16))
+
     # if the passed timestamp is in microseconds, converts it to milliseconds
     def convert_to_milliseconds(self, timestamp):
-        if (len(str(timestamp)) >= 16):
+        if (not self.is_milliseconds(timestamp)):
             return (int(timestamp/1000 + .5))
         return (timestamp)
 
@@ -155,10 +172,11 @@ class MatrixPreLoader(object):
             print(string)
 
 class MatrixDataGenerator(keras.utils.Sequence):
-    def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, batch_size=32, grab_data_from = (0, .75), print_loading_progress = False, debug = False):
+    def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, add_gaussian_noise = False, batch_size=32, grab_data_from = (0, .75), print_loading_progress = False, debug = False):
         self.matrix_dimensions = matrix_dimensions
         self.rgb = rgb
         self.twoD = twoD
+        self.add_gaussian_noise = add_gaussian_noise
         self.batch_size = batch_size
         self.valid_selection_range = grab_data_from
         self.print_loading_progress = print_loading_progress
@@ -206,6 +224,10 @@ class MatrixDataGenerator(keras.utils.Sequence):
             else:
                 xData = xData.reshape((xData.shape[0], xData.shape[1],1))
                 self.print_if_debug("xData shape after reshaping as gray 3D: %s" % (xData.shape,))
+            if (not self.add_gaussian_noise == None):
+                self.print_if_debug("Adding gaussian noise.")
+                noise = np.random.normal(0, self.add_gaussian_noise, xData.shape)
+                xData = np.add(xData, noise)
             yData = self.convert_patient_to_one_hot(patient)
             self.print_if_debug("yData shape: %s" % (yData.shape,))
             xValues.append(xData)
@@ -215,9 +237,11 @@ class MatrixDataGenerator(keras.utils.Sequence):
         return xData, yData
 
     def generate_patient_data(self, patient):
-        self.print_if_debug("Generating data for %s" % (patient))
+        self.print_if_debug("Getting matrix for %s" % (patient))
         (starts, ends) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
         patient_data = self.preLoader.Get_concatenated_dataframes()[patient]
+        self.print_if_debug((starts, ends))
+        self.print_if_debug(patient_data)
         dimension = patient_data.shape[1] * len(starts) # this dimension represents both the length and width of the dataframe
         dataframes = []
         final = pd.DataFrame()
@@ -235,6 +259,8 @@ class MatrixDataGenerator(keras.utils.Sequence):
             df = pd.DataFrame(patient_data.iloc[start_index:end_index, ].values)
             dataframes.append(df)
         result = pd.concat(dataframes, axis=1, ignore_index=True)
+        self.print_if_debug("Resulting Matrix")
+        self.print_if_debug(result)
         return (result)
 
     # takes the patient's directory and the directories of all the patients as arguments and returns the one hot encoding corresponding to that patient
