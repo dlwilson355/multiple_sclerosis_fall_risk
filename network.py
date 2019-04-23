@@ -6,18 +6,20 @@ from recurrentnetwork import RNNRnunner
 import pickle
 from convolutionalNetwork import ConvNetwork, MLPNetwork
 from matrixDataGenerator import MatrixDataGenerator
+from visualize import Visualize
 
 def Help():
     print('''network.py 
              -f <"folder", def: "D:\\deep learning dataset\\MS Fall Study">
-             -t <Network type: MLP, CNN, ResNet, NASNet, simple, GRU, LSTM, def: MLP> 
+             -t <Network type: MLP, CNN, ResNet, NASNet, simple, GRU, LSTM, Visual def: MLP> 
              -g <use data generator, def: 0>
              -d <training data size, def: 320> 
              -e <number of epochs, def: 30> 
              -s <steps in the sequence, def: 6> 
              -h <number of hidden units, def:75>
              -v <verbose,def:1>
-             -m <multi threaded, def:0''')
+             -m <multi threaded, def:0>
+             -p <number of patients to use, def:ALL>''')
 
 def main(argv):
     # setup options from command line
@@ -29,9 +31,10 @@ def main(argv):
     hiddenUnits = 75
     verbose = 1
     multiThreaded = 0
+    num_patients = 'ALL'
     folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
-        opts, args = getopt.getopt(argv,"?f:g:t:d:e:s:h:v:m:")
+        opts, args = getopt.getopt(argv,"?f:g:t:d:e:s:h:v:m:p:")
     except getopt.GetoptError:
         Help()
         return
@@ -59,8 +62,13 @@ def main(argv):
             verbose = int(arg)
         elif opt == '-m':
             multiThreaded = int(arg)
+        elif opt == '-p':
+            num_patients = int(arg)
 
-    if 'MLP'== netType:
+    if 'Visual' == netType:
+        vis = Visualize(folder,trainingDataSize,False, True, num_patients)
+        vis.run()
+    elif 'MLP'== netType:
         mlpNet = MLPNetwork(folder)
         mlpNet.run()
     elif 'CNN'== netType:
