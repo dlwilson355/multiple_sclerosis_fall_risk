@@ -190,7 +190,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.debug = debug
         self.preLoader = preLoader
         self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
-        self.last_activity = ''
+        self.last_activity = (0,0,'')
 
     def Get_last_activity(self):
         return self.last_activity
@@ -259,7 +259,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
         for i in range(len(starts)):
             start = starts[i]
             end = ends[i]
-            self.last_activity = activities[i]
+            self.last_activity = (start,end, activities[i])
             self.print_if_debug("Window range from index %d to %d." % (start, end))
             difference = end - start
             valid_start_range = (int(start + difference * self.valid_selection_range[0]), int(start + difference * self.valid_selection_range[1] - dimension))
