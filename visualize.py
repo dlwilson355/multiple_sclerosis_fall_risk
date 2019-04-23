@@ -3,13 +3,19 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pathlib import Path
 import os
+from PIL import Image
 from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
 
 class Visualize(object):
-    def __init__(self, directory, length, rgb, twoD,num_patients):
-        file = Path('plt')
+    def __init__(self, directory, length, rgb, twoD,num_patients,asplt):
+        self.asplt = asplt
+        if self.asplt:
+            self.subfolder = 'plt' 
+        else:
+            self.subfolder = 'img' 
+        file = Path(self.subfolder)
         if file.exists() == False:
-            os.mkdir('plt')
+            os.mkdir(self.subfolder)
         self.preLoader = MatrixPreLoader(directory = directory, num_patients_to_use = num_patients, print_loading_progress = True, debug = True)
         self.patients = self.preLoader.Get_patients()
         self.num_sequences = self.preLoader.Get_number_of_sensors()
@@ -38,10 +44,10 @@ class Visualize(object):
 
     def GetFileName(self,patient_name,act_name, index):
         if index >= 0:
-            name = 'plt\\item'+ str(index) + ' '
+            name = ' item'+ str(index)
         else:
-            name = 'plt\\'
-        filename = name + patient_name + ' ' + act_name + '.png'
+            name = ''
+        filename = self.subfolder + '\\' + patient_name + ' ' + act_name + name + '.png'
         return filename
 
     def AllPatients(self):
@@ -53,12 +59,16 @@ class Visualize(object):
                 start = starts[i]
                 end = ends[i]
                 df = pd.DataFrame(patient_data.iloc[start:end, ].values)
-                plt.plot(df)
                 act_name = self.ActivityName(activities[i],start,end)
-                plt.ylabel(act_name)
-                plt.xlabel(patient_name)
                 filename = self.GetFileName(patient_name,act_name, -1)
-                plt.savefig(filename)
+                if self.asplt:
+                    plt.plot(df)
+                    plt.ylabel(act_name)
+                    plt.xlabel(patient_name)
+                    plt.savefig(filename)
+                else:
+                    img = Image.fromarray(df.values, 'L')
+                    img.save(filename)
                 print(filename)
 
     def run(self):
@@ -68,13 +78,17 @@ class Visualize(object):
             x,y = self.gen.__getitem__(index)
             p = self.PatientFromY(y[0])
             patient_name = self.PatientName(self.patients[p])
-            start,end, activity = self.gen.Get_last_activity()
-            act_name = self.ActivityName(activity,start,end)
-            plt.ylabel(act_name)
-            plt.xlabel(patient_name)
-            plt.plot(x[0])
+            #start,end, activity = self.gen.Get_last_activity()
+            act_name = ''#self.ActivityName(activity,start,end)
             filename = self.GetFileName(patient_name,act_name, index)
-            plt.savefig(filename)
+            if self.asplt:
+                plt.ylabel(act_name)
+                plt.xlabel(patient_name)
+                plt.plot(x[0])
+                plt.savefig(filename)
+            else:
+                img = Image.fromarray(x[0], 'L')
+                img.save(filename)
             print(filename)
 
         return

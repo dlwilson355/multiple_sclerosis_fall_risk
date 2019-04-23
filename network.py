@@ -19,7 +19,8 @@ def Help():
              -h <number of hidden units, def:75>
              -v <verbose,def:1>
              -m <multi threaded, def:0>
-             -p <number of patients to use, def:ALL>''')
+             -p <number of patients to use, def:ALL>
+             -i <visual as plt or img, def:plt>''')
 
 def main(argv):
     # setup options from command line
@@ -32,9 +33,10 @@ def main(argv):
     verbose = 1
     multiThreaded = 0
     num_patients = 'ALL'
+    visualas = 'plt'
     folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
-        opts, args = getopt.getopt(argv,"?f:g:t:d:e:s:h:v:m:p:")
+        opts, args = getopt.getopt(argv,"?f:g:t:d:e:s:h:v:m:p:i:")
     except getopt.GetoptError:
         Help()
         return
@@ -64,9 +66,14 @@ def main(argv):
             multiThreaded = int(arg)
         elif opt == '-p':
             num_patients = int(arg)
+        elif opt == '-i':
+            visualas = arg
 
     if 'Visual' == netType:
-        vis = Visualize(folder,trainingDataSize,False, True, num_patients)
+        if 'plt' == visualas:
+            vis = Visualize(folder,trainingDataSize,False, True, num_patients, True)
+        else:
+            vis = Visualize(folder,trainingDataSize,False, True, num_patients, False)
         vis.run()
     elif 'MLP'== netType:
         mlpNet = MLPNetwork(folder)
