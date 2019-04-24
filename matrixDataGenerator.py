@@ -5,6 +5,8 @@ import keras
 import os
 import glob
 import random
+import time
+import datetime
 from skimage.transform import resize
 from skimage.color import gray2rgb
 
@@ -19,11 +21,6 @@ class MatrixPreLoader(object):
 
     def Get_patients(self):
         return self.patients
-
-    def Get_number_of_sensors(self):
-        patient = self.Get_patients()[0]
-        patient_data = self.Get_concatenated_dataframes()[patient]
-        return patient_data.shape[1]
 
     def Get_concatenated_dataframes(self):
         return self.preloaded_concatenated_dataframes
@@ -52,22 +49,25 @@ class MatrixPreLoader(object):
     def get_test_start_and_end_indicies(self, patient):
         starts = []
         ends = []
-        activities = []
         annotations_filepath = os.path.join(patient, "annotations.csv")
         annotation_data = pd.read_csv(annotations_filepath)
         previous_activity_type = ""
+        sample_patient_data = self.get_sample_data(patient)
         for row in range(annotation_data.shape[0]):
             activity_type = annotation_data.iloc[row, 2]
             if (not activity_type == previous_activity_type):
                 activity_start_timestamp = annotation_data.iloc[row, 4]
+                activity_start_timestamp = self.convert_to_milliseconds(activity_start_timestamp)
+                activity_start_timestamp = pd.to_datetime(activity_start_timestamp, unit="ms")
                 activity_end_timestamp = annotation_data.iloc[row, 5]
-                activity_start_index = self.get_corresponding_index(patient, activity_start_timestamp)
-                activity_end_index = self.get_corresponding_index(patient, activity_end_timestamp)
+                activity_end_timestamp = self.convert_to_milliseconds(activity_end_timestamp)
+                activity_end_timestamp = pd.to_datetime(activity_end_timestamp, unit="ms")
+                activity_start_index = sample_patient_data.index.get_loc(activity_start_timestamp, method="nearest")
+                activity_end_index = sample_patient_data.index.get_loc(activity_end_timestamp, method="nearest")
                 starts.append(activity_start_index)
                 ends.append(activity_end_index)
-                activities.append(activity_type)
             previous_activity_type = activity_type
-        return ((starts, ends,activities))
+        return ((starts, ends))
 
     # returns a list of directories from the session 1 lab MC10 test corresponding to the list of passed patient directories
     def get_session1_lab_data_directory(self, patient_directories):
@@ -103,7 +103,6 @@ class MatrixPreLoader(object):
     # interpolates the dataframe such that all have measurements taken every 8 ms
     def interpolate(self, df):
         df.rename(columns={ df.columns[0]: "date" }, inplace=True)
-        df['datetime'] = pd.to_datetime(df['date'])
         if (self.is_milliseconds(df.iloc[1, 0])):
             df['datetime'] = pd.to_datetime(df['date'], unit="ms")
         else:
@@ -122,26 +121,13 @@ class MatrixPreLoader(object):
                 valid_csv_filepaths += 1
         return (valid_csv_filepaths == 21)
 
-    # returns the index of the sensor data corresponding to the passed timestamp
-    def get_corresponding_index(self, patient_filepath, timestamp):
+    # picks one of the patient's sensor data files and returns it as a dataframe
+    def get_sample_data(self, patient_filepath):
         timestamp_filepath = [y for x in os.walk(patient_filepath) for y in glob.glob(os.path.join(x[0], 'accel.csv'))][0]
         self.print_if_debug("Checking %s" % (timestamp_filepath))
         df = pd.read_csv(timestamp_filepath)
-        adjustment_rate = self.get_average_ms_between_samples(df)
-        current_index = 0
-        current_timestamp = self.convert_to_milliseconds(df.iloc[current_index, 0])
-        while (abs(timestamp - current_timestamp) > adjustment_rate):
-            difference = timestamp - current_timestamp
-            current_index += int(difference/adjustment_rate)
-            current_timestamp = self.convert_to_milliseconds(df.iloc[current_index, 0])
-        return (current_index)
-
-    # returns the average milliseconds between samples
-    def get_average_ms_between_samples(self, df):
-        sample_1 = self.convert_to_milliseconds(df.iloc[0, 0])
-        sample_2 = self.convert_to_milliseconds(df.iloc[1000, 0])
-        average_ms_between_samples = (sample_2 - sample_1) / 1000
-        return (average_ms_between_samples)
+        df = self.interpolate(df)
+        return (df)
 
     def is_milliseconds(self, timestamp):
         return (not (len(str(timestamp)) >= 16))
@@ -190,10 +176,6 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.debug = debug
         self.preLoader = preLoader
         self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
-        self.last_activity = (0,0,'')
-
-    def Get_last_activity(self):
-        return self.last_activity
 
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -249,7 +231,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
 
     def generate_patient_data(self, patient):
         self.print_if_debug("Getting matrix for %s" % (patient))
-        (starts, ends, activities) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
+        (starts, ends) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
         patient_data = self.preLoader.Get_concatenated_dataframes()[patient]
         self.print_if_debug((starts, ends))
         self.print_if_debug(patient_data)
@@ -259,7 +241,6 @@ class MatrixDataGenerator(keras.utils.Sequence):
         for i in range(len(starts)):
             start = starts[i]
             end = ends[i]
-            self.last_activity = (start,end, activities[i])
             self.print_if_debug("Window range from index %d to %d." % (start, end))
             difference = end - start
             valid_start_range = (int(start + difference * self.valid_selection_range[0]), int(start + difference * self.valid_selection_range[1] - dimension))
