@@ -7,11 +7,12 @@ import pickle
 from convolutionalNetwork import ConvNetwork, MLPNetwork
 from matrixDataGenerator import MatrixDataGenerator
 from visualize import Visualize
+from table import DataTable
 
 def Help():
     print('''network.py 
              -f <"folder", def: "D:\\deep learning dataset\\MS Fall Study">
-             -t <Network type: MLP, CNN, ResNet, NASNet, simple, GRU, LSTM, Visual def: MLP> 
+             -t <Network type: MLP, CNN, ResNet, NASNet, simple, GRU, LSTM, Visual,Table def: MLP> 
              -g <use data generator, def: 0>
              -d <training data size, def: 320> 
              -e <number of epochs, def: 30> 
@@ -75,6 +76,9 @@ def main(argv):
         else:
             vis = Visualize(folder,trainingDataSize,False, True, num_patients, False)
         vis.run()
+    elif 'Table'== netType:
+        table = DataTable(folder)
+        table.run()
     elif 'MLP'== netType:
         mlpNet = MLPNetwork(folder)
         mlpNet.run()
