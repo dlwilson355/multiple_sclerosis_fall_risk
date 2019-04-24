@@ -18,8 +18,8 @@ class Visualize(object):
             os.mkdir(self.subfolder)
         self.preLoader = MatrixPreLoader(directory = directory, num_patients_to_use = num_patients, print_loading_progress = True, debug = True)
         self.patients = self.preLoader.Get_patients()
-        self.num_sequences = self.preLoader.Get_number_of_sensors()
-        self.gen =  MatrixDataGenerator(self.preLoader,rgb = rgb, twoD = twoD, batch_size = 1, grab_data_from = (0,1), print_loading_progress = False, debug = False)
+        self.train_gen =  MatrixDataGenerator(self.preLoader,rgb = rgb, twoD = twoD, batch_size = 1, grab_data_from = (0,0.7), print_loading_progress = False, debug = False)
+        self.test_gen =  MatrixDataGenerator(self.preLoader,rgb = rgb, twoD = twoD, batch_size = 1, grab_data_from = (0.7,1), print_loading_progress = False, debug = False)
         return
 
     def PatientName(self, folder):
@@ -71,16 +71,12 @@ class Visualize(object):
                     img.save(filename)
                 print(filename)
 
-    def run(self):
-        self.AllPatients()
-
-        for index in range(100):
-            x,y = self.gen.__getitem__(index)
+    def Items(self,gen,label):
+        for index in range(10):
+            x,y = gen.__getitem__(index)
             p = self.PatientFromY(y[0])
             patient_name = self.PatientName(self.patients[p])
-            #start,end, activity = self.gen.Get_last_activity()
-            act_name = ''#self.ActivityName(activity,start,end)
-            filename = self.GetFileName(patient_name,act_name, index)
+            filename = self.GetFileName(patient_name,label, index)
             if self.asplt:
                 plt.ylabel(act_name)
                 plt.xlabel(patient_name)
@@ -90,6 +86,13 @@ class Visualize(object):
                 img = Image.fromarray(x[0], 'L')
                 img.save(filename)
             print(filename)
+
+    def run(self):
+        self.Items(self.train_gen, 'train')
+        self.Items(self.test_gen, 'test')
+
+        #self.AllPatients()
+
 
         return
 

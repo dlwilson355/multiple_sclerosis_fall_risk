@@ -28,6 +28,11 @@ class MatrixPreLoader(object):
     def Get_activity_start_and_end_indicies(self):
         return self.preloaded_activity_start_and_end_indicies
 
+    def Get_number_of_sensors(self):
+        patient = self.Get_patients()[0]
+        patient_data = self.Get_concatenated_dataframes()[patient]
+        return patient_data.shape[1]
+
     def get_patient_list(self, num_patients):
         patients = glob.glob(os.path.join(self.master_directory, "*", ""))
         self.print_if_debug("Found %d patients, listed below." % (len(patients)))
@@ -49,6 +54,7 @@ class MatrixPreLoader(object):
     def get_test_start_and_end_indicies(self, patient):
         starts = []
         ends = []
+        activities = []
         annotations_filepath = os.path.join(patient, "annotations.csv")
         annotation_data = pd.read_csv(annotations_filepath)
         previous_activity_type = ""
@@ -66,8 +72,9 @@ class MatrixPreLoader(object):
                 activity_end_index = sample_patient_data.index.get_loc(activity_end_timestamp, method="nearest")
                 starts.append(activity_start_index)
                 ends.append(activity_end_index)
+                activities.append(activity_type)
             previous_activity_type = activity_type
-        return ((starts, ends))
+        return ((starts, ends,activities))
 
     # returns a list of directories from the session 1 lab MC10 test corresponding to the list of passed patient directories
     def get_session1_lab_data_directory(self, patient_directories):
@@ -176,6 +183,10 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.debug = debug
         self.preLoader = preLoader
         self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
+        self.normalize = True
+
+    def SetNormalize(self, normalize):
+        self.normalize = normalize
 
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -205,7 +216,8 @@ class MatrixDataGenerator(keras.utils.Sequence):
             self.print_if_loading("Loading patient %d of %d" % (i, len(patients)))
             self.print_if_debug("Generating data for %s" % (patient))
             xData = self.generate_patient_data(patient).values
-            xData = tf.keras.utils.normalize(xData, axis=-1)
+            if self.normalize:
+                xData = tf.keras.utils.normalize(xData, axis=-1)
             if (not self.matrix_dimensions == "NONE"):
                 xData = resize(xData, self.matrix_dimensions)
             if (self.rgb):
@@ -231,7 +243,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
 
     def generate_patient_data(self, patient):
         self.print_if_debug("Getting matrix for %s" % (patient))
-        (starts, ends) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
+        (starts, ends,activities) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
         patient_data = self.preLoader.Get_concatenated_dataframes()[patient]
         self.print_if_debug((starts, ends))
         self.print_if_debug(patient_data)
