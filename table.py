@@ -35,8 +35,8 @@ class DataTable(object):
                         if (not activity_type == previous_activity_type):
                             activity_start_timestamp = annotation_data.iloc[row, 4]
                             activity_end_timestamp = annotation_data.iloc[row, 5]
-                            activity_start_index,activity_end_index = self.find_activity(df,activity_start_timestamp,activity_end_timestamp)
-                            self.WriteRecord(df,patient_name, sensor_name, activity_type, activity_start_timestamp, activity_end_timestamp,activity_start_index,activity_end_index)
+                            activity_start_index,activity_end_index,frequency = self.find_activity(df,activity_start_timestamp,activity_end_timestamp)
+                            self.WriteRecord(df,patient_name, sensor_name, activity_type, activity_start_timestamp, activity_end_timestamp,activity_start_index,activity_end_index,frequency)
                         previous_activity_type = activity_type
 
     def get_session1_lab_data_directory(self, patient_directories):
@@ -65,6 +65,7 @@ class DataTable(object):
     def find_activity(self, df, activity_start_timestamp, activity_end_timestamp):
         activity_start_index = -1
         activity_end_index = -1
+        frequency = -1
         for col in df.columns:
             if col == 'Timestamp (ms)':
                 ivals = df[df[col]-activity_start_timestamp > 0].index.values
@@ -73,6 +74,7 @@ class DataTable(object):
                 ivals = df[df[col]-activity_end_timestamp > 0].index.values
                 if ivals.shape[0] > 0:
                     activity_end_index = ivals.astype(int)[0]
+                frequency = df[col].values[1]-df[col].values[0]
                 break
             elif col == 'Timestamp (microseconds)':
                 activity_start_timestamp = activity_start_timestamp*1000
@@ -83,8 +85,12 @@ class DataTable(object):
                 ivals = df[df[col]-activity_end_timestamp > 0].index.values
                 if ivals.shape[0] > 0:
                     activity_end_index = ivals.astype(int)[0]
+                frequency = int((df[col].values[1]-df[col].values[0]+500)/1000)
                 break
-        return (activity_start_index,activity_end_index)
+            else:
+                print(col)
+                break;
+        return (activity_start_index,activity_end_index,frequency)
 
     def WriteLabels(self):
         self.f.write('patient_name')
@@ -101,7 +107,9 @@ class DataTable(object):
         self.f.write(',')
         self.f.write('activity_end_index')
         self.f.write(',')
-        self.f.write('steps')
+        self.f.write('number of rows')
+        self.f.write(',')
+        self.f.write('frequency count')
         self.f.write(',')
         self.f.write('min1')
         self.f.write(',')
@@ -129,8 +137,8 @@ class DataTable(object):
         self.f.write('\n')
         self.f.flush()
 
-    def WriteRecord(self, df, patient_name, sensor_name, activity_type, activity_start_timestamp, activity_end_timestamp,activity_start_index,activity_end_index):
-        print(patient_name, sensor_name, activity_type, activity_start_timestamp, activity_end_timestamp,activity_start_index,activity_end_index)
+    def WriteRecord(self, df, patient_name, sensor_name, activity_type, activity_start_timestamp, activity_end_timestamp,activity_start_index,activity_end_index,frequency):
+        print(patient_name, sensor_name, activity_type, activity_start_timestamp, activity_end_timestamp,activity_start_index,activity_end_index,frequency)
         self.f.write(patient_name)
         self.f.write(',')
         self.f.write(sensor_name)
@@ -146,6 +154,8 @@ class DataTable(object):
         self.f.write(str(activity_end_index))
         self.f.write(',')
         self.f.write(str(activity_end_index-activity_start_index))
+        self.f.write(',')
+        self.f.write(str(frequency))
         self.f.write(',')
         df = df.drop(df.columns[0], axis=1)
         for c, col in enumerate(df.columns):

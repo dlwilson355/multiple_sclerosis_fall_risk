@@ -7,3 +7,6 @@ img/
 *.h5
 *.pyproj
 *.sln
+*.csv
+*.xlsx
+*.zip
