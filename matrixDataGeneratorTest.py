@@ -7,8 +7,9 @@ from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
 data_filepath = "D:\\deep learning dataset\\MS Fall Study" # you will obviously need to change this to the appropriate filepath based on where you placed the data folder
 
 def create_generators():
-        preLoader = MatrixPreLoader(data_filepath, num_patients_to_use = 15 , print_loading_progress = False)
-        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = None, batch_size = 32, grab_data_from = (0, .75), overflow = "BEFORE", print_loading_progress = False)
+        activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
+        preLoader = MatrixPreLoader(data_filepath, num_patients_to_use = "ALL", activity_types = activities_to_load, print_loading_progress = False)
+        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = .01, batch_size = 32, grab_data_from = (0, .75), overflow = "BEFORE", print_loading_progress = False)
         validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = None, batch_size = 32, grab_data_from = (.75, 1), overflow = "AFTER", print_loading_progress = False)
         return training_generator, validation_generator
 

@@ -15,12 +15,12 @@ from skimage.transform import resize
 from skimage.color import gray2rgb
 
 class MatrixPreLoader(object):
-    def __init__(self, directory, num_patients_to_use = "ALL", print_loading_progress = False):
+    def __init__(self, directory, num_patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
         self.master_directory = directory
         self.print_loading_progress = print_loading_progress
         self.patients = self.get_patient_list(num_patients_to_use)
         self.preloaded_patient_sensor_data = self.preload_patient_sensor_data(self.patients)
-        self.preloaded_activity_start_and_end_indicies = self.preload_activity_start_and_end_indicies(self.patients, self.preloaded_patient_sensor_data)
+        self.preloaded_activity_start_and_end_indicies = self.preload_activity_start_and_end_indicies(self.patients, self.preloaded_patient_sensor_data, activity_types)
         self.dimension = self.calculate_default_image_dimension(self.patients, self.preloaded_patient_sensor_data, self.preloaded_activity_start_and_end_indicies)
         self.num_activities = self.calculate_number_activities(self.patients, self.preloaded_activity_start_and_end_indicies)
 
@@ -86,26 +86,28 @@ class MatrixPreLoader(object):
         return (dataframes)
 
     # returns a dictionary of patients containing dictionaries of different sensor numbers containing lists of tuples of activity start and end indicies
-    def preload_activity_start_and_end_indicies(self, patients, sensor_data):
+    def preload_activity_start_and_end_indicies(self, patients, sensor_data, activity_types):
         self.print_if_loading("Preloading activity start and end indicies.")
         all_indicies = {}
         for patient_filepath in patients:
             sensor_indicies = {}
-            timestamps = self.get_start_and_end_timestamps(patient_filepath)
+            timestamps = self.get_start_and_end_timestamps(patient_filepath, activity_types)
             for i in sensor_data[patient_filepath]:
                 sensor_indicies[i] = self.get_corresponding_indicies(timestamps, sensor_data[patient_filepath][i])
             all_indicies[patient_filepath] = sensor_indicies
         return (all_indicies)
 
     # returns a list of tuples of activity start and end timestamps for the patient
-    def get_start_and_end_timestamps(self, patient):
+    def get_start_and_end_timestamps(self, patient, activity_types):
         timestamps = []
         annotations_filepath = os.path.join(patient, "annotations.csv")
         annotation_data = pd.read_csv(annotations_filepath)
         previous_activity_type = ""
+        activity_types_found = []
         for row in range(annotation_data.shape[0]):
             activity_type = annotation_data.iloc[row, 2]
-            if (not activity_type == previous_activity_type):
+            if ((activity_type in activity_types) and (not activity_type == previous_activity_type)):
+                activity_types_found.append(activity_type)
                 activity_start_timestamp = annotation_data.iloc[row, 4]
                 activity_start_timestamp = self.convert_to_milliseconds(activity_start_timestamp)
                 activity_start_timestamp = pd.to_datetime(activity_start_timestamp, unit="ms")
@@ -114,6 +116,12 @@ class MatrixPreLoader(object):
                 activity_end_timestamp = pd.to_datetime(activity_end_timestamp, unit="ms")
                 timestamps.append((activity_start_timestamp, activity_end_timestamp))
             previous_activity_type = activity_type
+        
+        # warning message for if some of the activities passed by the user were not found in the dataset
+        for activity in activity_types:
+            if (not activity in activity_types_found):
+                print("WARNING: Did not find activity named %s for %s." % (activity, patient))
+
         return (timestamps)
 
     # returns the indicies as a list of tuples of (start_index, end_index) corresponding to the timestamps for the sensor measurements
@@ -137,9 +145,12 @@ class MatrixPreLoader(object):
     # returns the number of activities found in the dataset and provides a warning if it is not the same for each patient
     def calculate_number_activities(self, patients, indicies):
         num_activities = len(indicies[patients[0]][0])
+
+        # warning message for it not all the patients have the same number of activities found in the dataset
         for patient in patients:
             if (not len(indicies[patient][0]) == num_activities):
-                print("Error: Found patient with %d activities." % (len(indicies[patient][0])))
+                print("WARNING: Patient %s has %d activities." % (patient, len(indicies[patient][0])))
+
         return (num_activities)
 
     # interpolates the dataframe such that all have measurements taken every 8 ms
@@ -194,18 +205,14 @@ class MatrixDataGenerator(keras.utils.Sequence):
     def SetNormalize(self, normalize):
         self.normalize = normalize
 
+    # returns the number of batches per epoch
     def __len__(self):
-        'Denotes the number of batches per epoch'
         return self.len
 
+    # generates a batch of data, the index argument doesn't do anything
     def __getitem__(self, index=0):
-        'Generate one batch of data'
         patient_indexes = [random.randint(0, len(self.preLoader.Get_patients())-1) for i in range(self.batch_size)]
-
-        # Find list of IDs
         patients_selected = [self.preLoader.Get_patients()[k] for k in patient_indexes]
-
-        # Generate data
         X, y = self.data_generation(patients_selected)
 
         return X, y
@@ -232,14 +239,18 @@ class MatrixDataGenerator(keras.utils.Sequence):
                 noise = np.random.normal(0, self.add_gaussian_noise, xData.shape)
                 xData = np.add(xData, noise)
             yData = self.convert_patient_to_one_hot(patient)
+
+            # warning for if data sample contains 'nan' values
             if (np.isnan(xData).any().any()):
-                print("Warning: NAN found in generated data sample for patient %s." % (patient))
+                print("WARNING: NAN found in generated data sample for patient %s." % (patient))
+
             xValues.append(xData)
             yValues.append(yData)
         xData = np.array(xValues)
         yData = np.array(yValues)
         return xData, yData
 
+    # generates a sample of data for a patient by grabbing sequential sensor readings for each sensor for each activity and aligning them vertically to form a square shaped data matrix
     def generate_patient_data(self, patient):
         patient_data = self.preLoader.Get_patient_sensor_data()[patient]
         patient_indicies = self.preLoader.Get_activity_start_and_end_indicies()[patient]
@@ -251,7 +262,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
                 activity_end_index = patient_indicies[sensor_number][activity_number][1]
                 difference = activity_end_index - activity_start_index
                 valid_start_index_range = (int(activity_start_index + difference * self.valid_selection_range[0]), int(activity_start_index + difference * self.valid_selection_range[1] - dimension))
-                if (valid_start_index_range[1] <= valid_start_index_range[0]): # need to find a better solution for this, this is necessary if the activity is too short to have a valid range
+                if (valid_start_index_range[1] <= valid_start_index_range[0]): # guarentees not overlap between training and validation data
                     if (self.overflow_direction == "BEFORE"):
                         selected_start_index = int(activity_start_index + difference * self.valid_selection_range[1] - dimension)
                     else:
