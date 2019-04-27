@@ -5,12 +5,11 @@ from keras.optimizers import Adam
 from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
 
 data_filepath = "D:\\deep learning dataset\\MS Fall Study" # you will obviously need to change this to the appropriate filepath based on where you placed the data folder
-data_filepath = "data"
 
 def create_generators():
-        preLoader = MatrixPreLoader(data_filepath, num_patients_to_use = 15, print_loading_progress = False, debug = False)
-        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = .01, batch_size = 32, grab_data_from = (0, .75), print_loading_progress = False, debug = False)
-        validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = None, batch_size = 32, grab_data_from = (.75, 1), print_loading_progress = False, debug = False)
+        preLoader = MatrixPreLoader(data_filepath, num_patients_to_use = 15 , print_loading_progress = False)
+        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = None, batch_size = 32, grab_data_from = (0, .75), overflow = "BEFORE", print_loading_progress = False)
+        validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = None, batch_size = 32, grab_data_from = (.75, 1), overflow = "AFTER", print_loading_progress = False)
         return training_generator, validation_generator
 
 def train_model_with_generator(model, training_generator, validation_generator):
