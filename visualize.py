@@ -7,7 +7,7 @@ from PIL import Image
 from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
 
 class Visualize(object):
-    def __init__(self, directory, length, rgb, twoD,num_patients,asplt):
+    def __init__(self, directory, num_patients,asplt):
         self.asplt = asplt
         if self.asplt:
             self.subfolder = 'plt' 
@@ -16,10 +16,11 @@ class Visualize(object):
         file = Path(self.subfolder)
         if file.exists() == False:
             os.mkdir(self.subfolder)
-        self.preLoader = MatrixPreLoader(directory = directory, num_patients_to_use = num_patients, print_loading_progress = True, debug = True)
+        activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
+        self.preLoader = MatrixPreLoader(directory = directory, num_patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
         self.patients = self.preLoader.Get_patients()
-        self.train_gen =  MatrixDataGenerator(self.preLoader,rgb = rgb, twoD = twoD, batch_size = 1, grab_data_from = (0,0.7), print_loading_progress = False, debug = False)
-        self.test_gen =  MatrixDataGenerator(self.preLoader,rgb = rgb, twoD = twoD, batch_size = 1, grab_data_from = (0.7,1), print_loading_progress = False, debug = False)
+        self.train_gen =  MatrixDataGenerator(self.preLoader,rgb = False, twoD = True, batch_size = 1, add_gaussian_noise = .01, overflow = "BEFORE", grab_data_from = (0,0.7), print_loading_progress = False)
+        self.test_gen =  MatrixDataGenerator(self.preLoader,rgb = False, twoD = True, batch_size = 1, add_gaussian_noise = .01, overflow = "BEFORE", grab_data_from = (0.7,1), print_loading_progress = False)
         return
 
     def PatientName(self, folder):
@@ -52,24 +53,25 @@ class Visualize(object):
 
     def AllPatients(self):
         for patient in self.patients:
-            patient_data = self.preLoader.Get_concatenated_dataframes()[patient]
-            (starts, ends, activities) = self.preLoader.Get_activity_start_and_end_indicies()[patient]
+            patient_data = self.preLoader.Get_patient_sensor_data()[patient]
+            patient_indicies = self.preLoader.Get_activity_start_and_end_indicies()[patient]
             patient_name = self.PatientName(patient)
-            for i in range(len(starts)):
-                start = starts[i]
-                end = ends[i]
-                df = pd.DataFrame(patient_data.iloc[start:end, ].values)
-                act_name = self.ActivityName(activities[i],start,end)
-                filename = self.GetFileName(patient_name,act_name, -1)
-                if self.asplt:
-                    plt.plot(df)
-                    plt.ylabel(act_name)
-                    plt.xlabel(patient_name)
-                    plt.savefig(filename)
-                else:
-                    img = Image.fromarray(df.values, 'L')
-                    img.save(filename)
-                print(filename)
+            for activity_number in range(self.preLoader.Get_num_activities()):
+                for sensor_number in patient_data:
+                    start = patient_indicies[sensor_number][activity_number][0]
+                    end = patient_indicies[sensor_number][activity_number][1]
+                    df = pd.DataFrame(patient_data[sensor_number].iloc[start:end, ].values)
+                    act_name = self.ActivityName(patient_indicies[sensor_number][activity_number][2],start,end)
+                    filename = self.GetFileName(patient_name,act_name, -1)
+                    if self.asplt:
+                        plt.plot(df)
+                        plt.ylabel(act_name)
+                        plt.xlabel(patient_name)
+                        plt.savefig(filename)
+                    else:
+                        img = Image.fromarray(df.values, 'L')
+                        img.save(filename)
+                    print(filename)
 
     def Items(self,gen,label):
         for index in range(10):
@@ -78,7 +80,7 @@ class Visualize(object):
             patient_name = self.PatientName(self.patients[p])
             filename = self.GetFileName(patient_name,label, index)
             if self.asplt:
-                plt.ylabel(act_name)
+                plt.ylabel(label)
                 plt.xlabel(patient_name)
                 plt.plot(x[0])
                 plt.savefig(filename)
@@ -88,11 +90,9 @@ class Visualize(object):
             print(filename)
 
     def run(self):
+        self.AllPatients()
         self.Items(self.train_gen, 'train')
         self.Items(self.test_gen, 'test')
-
-        #self.AllPatients()
-
 
         return
 

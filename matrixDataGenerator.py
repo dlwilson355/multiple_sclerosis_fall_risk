@@ -27,6 +27,9 @@ class MatrixPreLoader(object):
     def Get_patients(self):
         return self.patients
 
+    def get_number_of_patients(self):
+        return len(self.patients)
+
     def Get_patient_sensor_data(self):
         return self.preloaded_patient_sensor_data
 
@@ -114,7 +117,7 @@ class MatrixPreLoader(object):
                 activity_end_timestamp = annotation_data.iloc[row, 5]
                 activity_end_timestamp = self.convert_to_milliseconds(activity_end_timestamp)
                 activity_end_timestamp = pd.to_datetime(activity_end_timestamp, unit="ms")
-                timestamps.append((activity_start_timestamp, activity_end_timestamp))
+                timestamps.append((activity_start_timestamp, activity_end_timestamp,activity_type))
             previous_activity_type = activity_type
         
         # warning message for if some of the activities passed by the user were not found in the dataset
@@ -130,7 +133,7 @@ class MatrixPreLoader(object):
         for timestamp in timestamps:
             start_index = dataframe.index.get_loc(timestamp[0], method="nearest")
             end_index = dataframe.index.get_loc(timestamp[1], method="nearest")
-            indicies.append((start_index, end_index))
+            indicies.append((start_index, end_index,timestamp[2]))
         return (indicies)
 
     # returns the "dimension" (both the width and height) of the data samples that will be generated
