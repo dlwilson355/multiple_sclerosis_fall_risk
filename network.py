@@ -1,43 +1,75 @@
-import keras
-from data_reader import DataReader
-import os
+from keras.applications.vgg16 import VGG16
+from keras.callbacks import ModelCheckpoint
+from keras.optimizers import Adam
 import sys, getopt
-from recurrentnetwork import RNNRnunner
-import pickle
-from convolutionalNetwork import ConvNetwork, MLPNetwork
-from matrixDataGenerator import MatrixDataGenerator
+from recurrentnetwork import RNNImp
 from visualize import Visualize
 from table import DataTable
+from vgg16 import VGG16Imp
+from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
+from keras.applications.resnet50 import ResNet50
+
+def create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize):
+        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = gaus, zero_sensors = 0, batch_size = batchSize, grab_data_from = (0, .75), overflow = "BEFORE", print_loading_progress = False)
+        validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = 0, zero_sensors = 0, batch_size = batchSize, grab_data_from = (.75, 1), overflow = "AFTER", print_loading_progress = False)
+        return training_generator, validation_generator
+
+def train_model_with_generator(model, training_generator, validation_generator,netType):
+        part_file = "weights({0:s})".format(netType)
+        weights_filepath = part_file+"-{epoch:02d}-{val_acc:.2f}.hdf5"
+        checkpoint = ModelCheckpoint(weights_filepath, monitor="val_acc", verbose=1, save_best_only=True, mode="max")
+        optimizer = Adam(lr=0.0001)
+        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+        model.fit_generator(training_generator, epochs=10, steps_per_epoch=10, validation_steps=10, validation_data=validation_generator, callbacks=[checkpoint])
+
+NETTYPE_INVALID = 0
+NETTYPE_VGGBN = 1
+NETTYPE_VGG16 = 2
+NETTYPE_RESNET = 3
+NETTYPE_SIMPLE = 4
+NETTYPE_GRU = 5
+NETTYPE_LSTM = 6
+
+def GetType(netType):
+    if 'VGGBN'== netType:
+        return NETTYPE_VGGBN
+    elif 'VGG16'== netType:
+        return NETTYPE_VGG16
+    elif 'ResNet'== netType:
+        return NETTYPE_RESNET
+    elif 'Simple' == netType:
+        return NETTYPE_SIMPLE
+    elif 'GRU' == netType:
+        return NETTYPE_GRU
+    elif 'LSTM' == netType:
+        return NETTYPE_LSTM
+    return NETTYPE_INVALID
+
 
 def Help():
     print('''network.py 
              -f <"folder", def: "D:\\deep learning dataset\\MS Fall Study">
-             -t <Network type: MLP, CNN, ResNet, NASNet, simple, GRU, LSTM, Visual,Table def: MLP> 
-             -g <use data generator, def: 0>
-             -d <training data size, def: 320> 
+             -t <Network type: VGGBN, VGG16, Simple, GRU, LSTM, Plt,Img,Table def: VGG16> 
+                Plt - generate plots for all patients and all activities over all sensors
+                Img - generate images for all patients and all activities over all sensors
+                Table - generate csv file for all patients, all activities, all sensors with indices, frequencies, min, max, mean and stdev
+             -1 <first part of input shape argument, def: 224> 
+             -2 <second part of input shape argument, def: 224> 
              -e <number of epochs, def: 30> 
-             -s <steps in the sequence, def: 6> 
              -h <number of hidden units, def:75>
-             -v <verbose,def:1>
-             -m <multi threaded, def:0>
-             -p <number of patients to use, def:ALL>
-             -i <visual as plt or img, def:plt>''')
+             -p <number of patients to use, def:ALL>''')
 
 def main(argv):
     # setup options from command line
-    useDataGenerator = False
-    netType = 'MLP'
-    trainingDataSize = 320
+    netType = 'VGG16'
+    input_shape1 = 224
+    input_shape2 = 224
     numberOfEpochs = 30
-    stepsInSequence = 6 
     hiddenUnits = 75
-    verbose = 1
-    multiThreaded = 0
     num_patients = 'ALL'
-    visualas = 'plt'
     folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
-        opts, args = getopt.getopt(argv,"?f:g:t:d:e:s:h:v:m:p:i:")
+        opts, args = getopt.getopt(argv,"?f:t:1:2:e:h:p:")
     except getopt.GetoptError:
         Help()
         return
@@ -47,55 +79,80 @@ def main(argv):
             return
         elif opt == '-f':
             folder = arg
-        elif opt == '-g':
-            useDataGenerator = int(arg)
         elif opt == '-t':
             netType = arg
-        elif opt == '-d':
-            trainingDataSize = int(arg)
+        elif opt == '-1':
+            input_shape1 = int(arg)
+        elif opt == '-2':
+            input_shape2 = int(arg)
         elif opt == '-e':
             numberOfEpochs = int(arg)
-        elif opt == '-s':
-            stepsInSequence = int(arg)
-            # steps has to be an even number
-            #stepsInSequence = int(stepsInSequence) * 2
         elif opt == '-h':
             hiddenUnits = int(arg)
-        elif opt == '-v':
-            verbose = int(arg)
-        elif opt == '-m':
-            multiThreaded = int(arg)
         elif opt == '-p':
             num_patients = int(arg)
-        elif opt == '-i':
-            visualas = arg
 
-    if 'Visual' == netType:
-        if 'plt' == visualas:
-            vis = Visualize(folder,trainingDataSize,False, True, num_patients, True)
-        else:
-            vis = Visualize(folder,trainingDataSize,False, True, num_patients, False)
+    if 'Plt' == netType:
+        vis = Visualize(folder, num_patients, True)
+        vis.run()
+    elif 'Img' == netType:
+        vis = Visualize(folder, num_patients, False)
         vis.run()
     elif 'Table'== netType:
         table = DataTable(folder)
         table.run()
-    elif 'MLP'== netType:
-        mlpNet = MLPNetwork(folder)
-        mlpNet.run()
-    elif 'CNN'== netType:
-        convNet = ConvNetwork(folder, stepsInSequence,trainingDataSize, numberOfEpochs)
-        convNet.run()
-    elif useDataGenerator:
-        run = RNNRnunner(verbose,multiThreaded,folder,0)
-        run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, None)
     else:
-        reader = DataReader(folder)
-        data = reader.get_data(True,True)
-        numFeatures = reader.NumberOfFeatures()
-        print(data[0].shape)
-        print(data[1].shape)
-        run = RNNRnunner(verbose,multiThreaded,folder,numFeatures)
-        run.RunRNN(netType,trainingDataSize,numberOfEpochs, stepsInSequence,hiddenUnits, data)
+        netTypeVal = GetType(netType)
+        if NETTYPE_INVALID == netTypeVal:
+            print('unknown tpye:', netType)
+            return
+        print('##################################################################################')
+        print('# Run({0:s}, shape ({1:d}, {2:d}), epochs {3:d}, hidden units {4:d})             #'.format(netType,input_shape1, input_shape2, numberOfEpochs, hiddenUnits))
+        print('##################################################################################')
+        rgb = True
+        twoD = False
+        gaus = 0.01
+        batchSize = 32
+        input_shape = (input_shape1, input_shape2)
+        activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
+        preLoader = MatrixPreLoader(dataset_directory = folder, num_patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
+        num_features = preLoader.get_number_of_patients()
+        if NETTYPE_VGGBN == netTypeVal:
+            vgg = VGG16Imp()
+            model = vgg.VGG16WithBN(input_shape=input_shape, classes=num_features)
+        elif NETTYPE_VGG16 == netTypeVal:
+            model = VGG16(weights=None, classes = num_features)
+        elif NETTYPE_RESNET == netTypeVal:
+            base_model = ResNet50(include_top=False, weights=None,  pooling=None, classes=self.num_features,input_shape=(self.length_of_sequence,self.num_sequences,self.depth))
+            x = base_model.output
+            x = keras.layers.GlobalAveragePooling2D()(x)
+            x = keras.layers.Dense(1024, activation='relu')(x)
+            predictions = keras.layers.Dense(self.num_features, activation='softmax')(x)
+            model = keras.models.Model(inputs=base_model.input, outputs=predictions)
+        elif NETTYPE_SIMPLE == netTypeVal:
+            rgb = False
+            twoD = True
+            rnn = RNNImp(hiddenUnits)
+            model = rnn.SimpleRNN(input_shape, num_features)
+        elif NETTYPE_GRU == netTypeVal:
+            rgb = False
+            twoD = True
+            rnn = RNNImp(hiddenUnits)
+            model = rnn.GRU(input_shape, num_features)
+        elif NETTYPE_LSTM == netTypeVal:
+            rgb = False
+            twoD = True
+            rnn = RNNImp(hiddenUnits)
+            model = rnn.LSTM(input_shape, num_features)
+        else:
+            return
+
+        print("create_generators")
+        training_gen, validation_gen = create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize)
+
+        print("train_model_with_generator")
+        train_model_with_generator(model, training_gen, validation_gen, netType)
+
 
 if __name__ == "__main__":  
     main(sys.argv[1:])
