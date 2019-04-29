@@ -14,13 +14,13 @@ def create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize):
         validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = 0, zero_sensors = 0, batch_size = batchSize, grab_data_from = (.75, 1), overflow = "AFTER", print_loading_progress = False)
         return training_generator, validation_generator
 
-def train_model_with_generator(model, training_generator, validation_generator,netType):
+def train_model_with_generator(model, training_generator, validation_generator,numberOfEpochs,netType):
         part_file = "weights({0:s})".format(netType)
         weights_filepath = part_file+"-{epoch:02d}-{val_acc:.2f}.hdf5"
         checkpoint = ModelCheckpoint(weights_filepath, monitor="val_acc", verbose=1, save_best_only=True, mode="max")
         optimizer = Adam(lr=0.0001)
         model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit_generator(training_generator, epochs=10, steps_per_epoch=10, validation_steps=10, validation_data=validation_generator, callbacks=[checkpoint])
+        model.fit_generator(training_generator, epochs=numberOfEpochs, steps_per_epoch=10, validation_steps=10, validation_data=validation_generator, callbacks=[checkpoint])
 
 NETTYPE_INVALID = 0
 NETTYPE_VGGBN = 1
@@ -151,7 +151,7 @@ def main(argv):
         training_gen, validation_gen = create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize)
 
         print("train_model_with_generator")
-        train_model_with_generator(model, training_gen, validation_gen, netType)
+        train_model_with_generator(model, training_gen, validation_gen, numberOfEpochs,netType)
 
 
 if __name__ == "__main__":  
