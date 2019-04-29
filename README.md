@@ -9,7 +9,7 @@ TODO:\
 5.)  Use convolutional network as feature extractor to predict fall risk.\
 6.)  Test UNet.\
 7.)  Fiddle with parameters.\
-8.)  Test VGG with batch normalization (https://gist.github.com/jjangsangy/38d644606130f05b806a4261c493a820).\
+8.)  Test VGG with batch normalization (https://gist.github.com/jjangsangy/38d644606130f05b806a4261c493a820). \
 9.)  Find solution for redundant activities (concatenate them?).  Also ask Ryan about this.\
 10.) Maybe improve rounding errors when finding indexes of interpolated timestamps.\
-11.) Experiment with which activities to include in training.\
+11.) Experiment with which activities to include in training.

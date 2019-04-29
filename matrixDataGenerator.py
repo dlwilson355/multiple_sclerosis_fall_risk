@@ -1,7 +1,3 @@
-"""
-TODO:   Concatenate redundant activities?
-        Maybe improve rounding errors for more accurate activity windows.
-"""
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -15,8 +11,8 @@ from skimage.transform import resize
 from skimage.color import gray2rgb
 
 class MatrixPreLoader(object):
-    def __init__(self, directory, num_patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
-        self.master_directory = directory
+    def __init__(self, dataset_directory, num_patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
+        self.master_directory = dataset_directory
         self.print_loading_progress = print_loading_progress
         self.patients = self.get_patient_list(num_patients_to_use)
         self.preloaded_patient_sensor_data = self.preload_patient_sensor_data(self.patients)
@@ -189,20 +185,18 @@ class MatrixPreLoader(object):
             print(string)
 
 class MatrixDataGenerator(keras.utils.Sequence):
-    def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, add_gaussian_noise = False, batch_size=32, grab_data_from = (0, .75), overflow="AFTER", print_loading_progress = False):
+    def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, normalize = True, add_gaussian_noise = 0, zero_sensors = 0, batch_size=32, grab_data_from = (0, .75), overflow="AFTER", print_loading_progress = False):
         self.matrix_dimensions = matrix_dimensions
         self.rgb = rgb
         self.twoD = twoD
-        self.add_gaussian_noise = add_gaussian_noise
+        self.gaussian_noise_variance = add_gaussian_noise
+        self.num_sensors_to_zero = zero_sensors
         self.batch_size = batch_size
         self.valid_selection_range = grab_data_from
         self.overflow_direction = overflow
         self.print_loading_progress = print_loading_progress
         self.preLoader = preLoader
         self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
-        self.normalize = True
-
-    def SetNormalize(self, normalize):
         self.normalize = normalize
 
     # returns the number of batches per epoch
@@ -217,6 +211,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
 
         return X, y
 
+    # calls the function to create a data matrix for the each patient in patients and then transforms it appropriately with resizing, adding rgb channels, adding gaussing noise, reshaping, ect...
     def data_generation(self, patients):
         xValues = []
         yValues = []
@@ -224,7 +219,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.print_if_loading("Generating batch of data with patients: %s" % (patients))
         for i, patient in enumerate(patients):
             self.print_if_loading("Generating data sample for patient %d of %d" % (i, len(patients)))
-            xData = self.generate_patient_data(patient).values
+            xData = self.generate_patient_matrix(patient).values
             if self.normalize:
                 xData = tf.keras.utils.normalize(xData, axis=-1)
             if (not self.matrix_dimensions == "NONE"):
@@ -235,9 +230,11 @@ class MatrixDataGenerator(keras.utils.Sequence):
                 xData = xData.reshape((xData.shape[0], xData.shape[1]))
             else:
                 xData = xData.reshape((xData.shape[0], xData.shape[1],1))
-            if (not self.add_gaussian_noise == None):
-                noise = np.random.normal(0, self.add_gaussian_noise, xData.shape)
+            if (self.gaussian_noise_variance > 0):
+                noise = np.random.normal(0, self.gaussian_noise_variance, xData.shape)
                 xData = np.add(xData, noise)
+            if (self.num_sensors_to_zero > 0):
+                self.zero_columns(xData, self.num_sensors_to_zero)
             yData = self.convert_patient_to_one_hot(patient)
 
             # warning for if data sample contains 'nan' values
@@ -250,8 +247,8 @@ class MatrixDataGenerator(keras.utils.Sequence):
         yData = np.array(yValues)
         return xData, yData
 
-    # generates a sample of data for a patient by grabbing sequential sensor readings for each sensor for each activity and aligning them vertically to form a square shaped data matrix
-    def generate_patient_data(self, patient):
+    # generates a data matrix for a patient by grabbing sequential sensor readings for each sensor for each activity and aligning them vertically to form a square shaped data matrix
+    def generate_patient_matrix(self, patient):
         patient_data = self.preLoader.Get_patient_sensor_data()[patient]
         patient_indicies = self.preLoader.Get_activity_start_and_end_indicies()[patient]
         dimension = self.preLoader.Get_dimension()
@@ -262,7 +259,11 @@ class MatrixDataGenerator(keras.utils.Sequence):
                 activity_end_index = patient_indicies[sensor_number][activity_number][1]
                 difference = activity_end_index - activity_start_index
                 valid_start_index_range = (int(activity_start_index + difference * self.valid_selection_range[0]), int(activity_start_index + difference * self.valid_selection_range[1] - dimension))
-                if (valid_start_index_range[1] <= valid_start_index_range[0]): # guarentees not overlap between training and validation data
+                if (valid_start_index_range[1] <= valid_start_index_range[0]): # guarantees not overlap between training and validation data
+                    
+                    # Warning for if the activity window is too small such that there is potential overflow outside the specified bounds the data generator is supposed to grab data from.
+                    print("WARNING: Overlap detected.  Overflowing selection window to prevent overlap.")
+
                     if (self.overflow_direction == "BEFORE"):
                         selected_start_index = int(activity_start_index + difference * self.valid_selection_range[1] - dimension)
                     else:
@@ -274,6 +275,13 @@ class MatrixDataGenerator(keras.utils.Sequence):
                 dataframes.append(df)
         result = pd.concat(dataframes, axis=1, ignore_index=True)
         return (result)
+
+    # takes a data matrix (represented as a numpy array) as input and randomly zeros out the specified number of columns
+    def zero_columns(self, matrix, num_columns):
+        for column in range(num_columns):
+            column_index = np.random.randint(matrix.shape[1])
+            matrix[:, column_index] = np.zeros(matrix.shape[1:])
+        return (matrix)
 
     # takes the patient's directory and the directories of all the patients as arguments and returns the one hot encoding corresponding to that patient
     def convert_patient_to_one_hot(self, patient):
