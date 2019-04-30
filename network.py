@@ -89,7 +89,7 @@ def main(argv):
         elif opt == '-2':
             input_shape2 = int(arg)
         elif opt == '-g':
-            gaus = int(arg)
+            gaus = float(arg)
         elif opt == '-e':
             numberOfEpochs = int(arg)
         elif opt == '-h':
@@ -112,7 +112,7 @@ def main(argv):
             print('unknown tpye:', netType)
             return
         print('##################################################################################')
-        print('# {0:s} shape ({1:d}, {2:d}) epochs {3:d} gaus {4:d} hidden units {5:d}          #'.format(netType,input_shape1, input_shape2, numberOfEpochs, gaus, hiddenUnits))
+        print('# {0:s} shape ({1:d}, {2:d}) epochs {3:d} gaus {4:f} hidden units {5:d}          #'.format(netType,input_shape1, input_shape2, numberOfEpochs, gaus, hiddenUnits))
         print('##################################################################################')
         rgb = True
         twoD = False
