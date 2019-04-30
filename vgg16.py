@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import keras
-from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
 
 class VGG16Imp(object):
     def __init__(self):
@@ -48,17 +47,17 @@ class VGG16Imp(object):
         self.model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
 
         # Block 5
-        self.ConvBlock(512, dropout=conv_dropout, activation=activation, block=5, layer=1)
-        self.ConvBlock(512, dropout=conv_dropout, activation=activation, block=5, layer=2)
-        self.ConvBlock(512, dropout=conv_dropout, activation=activation, block=5, layer=3)
-        self.model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool'))
+        self.ConvBlock(512, dropout=conv_dropout, activation=activation)
+        self.ConvBlock(512, dropout=conv_dropout, activation=activation)
+        self.ConvBlock(512, dropout=conv_dropout, activation=activation)
+        self.model.add(keras.layers.MaxPooling2D((2, 2), strides=(2, 2)))
 
         # Flatten
         self.model.add(keras.layers.GlobalAveragePooling2D())
 
         # FC Layers
-        self.DenseBlock(4096, dropout=dropout, activation=activation, name='fc1')
-        self.DenseBlock(4096, dropout=dropout, activation=activation, name='fc2')
+        self.DenseBlock(4096, dropout=dropout, activation=activation)
+        self.DenseBlock(4096, dropout=dropout, activation=activation)
     
         # Output layer
         self.model.add(keras.layers.Dense(classes, activation='softmax', name='predictions'))

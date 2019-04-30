@@ -6,12 +6,13 @@ from recurrentnetwork import RNNImp
 from visualize import Visualize
 from table import DataTable
 from vgg16 import VGG16Imp
+from resnet import ResNetImp
 from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
-from keras.applications.resnet50 import ResNet50
+
 
 def create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize):
-        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = gaus, zero_sensors = 0, batch_size = batchSize, grab_data_from = (0, .75), overflow = "BEFORE", print_loading_progress = False)
-        validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = 0, zero_sensors = 0, batch_size = batchSize, grab_data_from = (.75, 1), overflow = "AFTER", print_loading_progress = False)
+        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = gaus, zero_sensors = 0, batch_size = batchSize, grab_data_from = (0, .7), overflow = "BEFORE", print_loading_progress = False)
+        validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = 0, zero_sensors = 0, batch_size = batchSize, grab_data_from = (.7, 1), overflow = "AFTER", print_loading_progress = False)
         return training_generator, validation_generator
 
 def train_model_with_generator(model, training_generator, validation_generator,numberOfEpochs,netType):
@@ -55,6 +56,7 @@ def Help():
                 Table - generate csv file for all patients, all activities, all sensors with indices, frequencies, min, max, mean and stdev
              -1 <first part of input shape argument, def: 224> 
              -2 <second part of input shape argument, def: 224> 
+             -g <gaussian noise for training, def: 0.01>
              -e <number of epochs, def: 30> 
              -h <number of hidden units, def:75>
              -p <number of patients to use, def:ALL>''')
@@ -64,12 +66,13 @@ def main(argv):
     netType = 'VGG16'
     input_shape1 = 224
     input_shape2 = 224
+    gaus = 0.01
     numberOfEpochs = 30
     hiddenUnits = 75
     num_patients = 'ALL'
     folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
-        opts, args = getopt.getopt(argv,"?f:t:1:2:e:h:p:")
+        opts, args = getopt.getopt(argv,"?f:t:1:2:g:e:h:p:")
     except getopt.GetoptError:
         Help()
         return
@@ -85,6 +88,8 @@ def main(argv):
             input_shape1 = int(arg)
         elif opt == '-2':
             input_shape2 = int(arg)
+        elif opt == '-g':
+            gaus = int(arg)
         elif opt == '-e':
             numberOfEpochs = int(arg)
         elif opt == '-h':
@@ -107,11 +112,10 @@ def main(argv):
             print('unknown tpye:', netType)
             return
         print('##################################################################################')
-        print('# Run({0:s}, shape ({1:d}, {2:d}), epochs {3:d}, hidden units {4:d})             #'.format(netType,input_shape1, input_shape2, numberOfEpochs, hiddenUnits))
+        print('# Run({0:s} shape ({1:d}, {2:d}) epochs {3:d} gaus {4:d} hidden units {5:d})     #'.format(netType,input_shape1, input_shape2, numberOfEpochs, gaus, hiddenUnits))
         print('##################################################################################')
         rgb = True
         twoD = False
-        gaus = 0.01
         batchSize = 32
         input_shape = (input_shape1, input_shape2)
         activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
@@ -119,16 +123,12 @@ def main(argv):
         num_features = preLoader.get_number_of_patients()
         if NETTYPE_VGGBN == netTypeVal:
             vgg = VGG16Imp()
-            model = vgg.VGG16WithBN(input_shape=input_shape, classes=num_features)
+            model = vgg.VGG16WithBN(input_shape=(input_shape1,input_shape2,3), classes=num_features)
         elif NETTYPE_VGG16 == netTypeVal:
-            model = VGG16(weights=None, classes = num_features)
+            model = VGG16(weights=None, classes = num_features,input_shape=(input_shape1,input_shape2,3))
         elif NETTYPE_RESNET == netTypeVal:
-            base_model = ResNet50(include_top=False, weights=None,  pooling=None, classes=self.num_features,input_shape=(self.length_of_sequence,self.num_sequences,self.depth))
-            x = base_model.output
-            x = keras.layers.GlobalAveragePooling2D()(x)
-            x = keras.layers.Dense(1024, activation='relu')(x)
-            predictions = keras.layers.Dense(self.num_features, activation='softmax')(x)
-            model = keras.models.Model(inputs=base_model.input, outputs=predictions)
+            resnet = ResNetImp()
+            model = resnet.ResNet((input_shape1,input_shape2,3),num_features)
         elif NETTYPE_SIMPLE == netTypeVal:
             rgb = False
             twoD = True
