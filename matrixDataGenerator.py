@@ -12,6 +12,7 @@ from skimage.color import gray2rgb
 
 class MatrixPreLoader(object):
     def __init__(self, dataset_directory, num_patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
+        print(activity_types)
         self.master_directory = dataset_directory
         self.print_loading_progress = print_loading_progress
         self.patients = self.get_patient_list(num_patients_to_use)
@@ -189,6 +190,7 @@ class MatrixPreLoader(object):
 
 class MatrixDataGenerator(keras.utils.Sequence):
     def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, normalize = True, add_gaussian_noise = 0, zero_sensors = 0, batch_size=32, grab_data_from = (0, .75), overflow="AFTER", print_loading_progress = False):
+        print(matrix_dimensions ,rgb,twoD,add_gaussian_noise,zero_sensors,batch_size,grab_data_from,overflow)
         self.matrix_dimensions = matrix_dimensions
         self.rgb = rgb
         self.twoD = twoD
@@ -201,14 +203,20 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.preLoader = preLoader
         self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
         self.normalize = normalize
+        self.distribution = np.zeros(self.preLoader.get_number_of_patients())
 
     # returns the number of batches per epoch
     def __len__(self):
         return self.len
 
+    def GetDistribution(self):
+        return self.distribution
+
     # generates a batch of data, the index argument doesn't do anything
     def __getitem__(self, index=0):
         patient_indexes = [random.randint(0, len(self.preLoader.Get_patients())-1) for i in range(self.batch_size)]
+        for k in patient_indexes:
+            self.distribution[k] = self.distribution[k] + 1
         patients_selected = [self.preLoader.Get_patients()[k] for k in patient_indexes]
         X, y = self.data_generation(patients_selected)
 

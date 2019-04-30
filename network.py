@@ -112,7 +112,7 @@ def main(argv):
             print('unknown tpye:', netType)
             return
         print('##################################################################################')
-        print('# Run({0:s} shape ({1:d}, {2:d}) epochs {3:d} gaus {4:d} hidden units {5:d})     #'.format(netType,input_shape1, input_shape2, numberOfEpochs, gaus, hiddenUnits))
+        print('# {0:s} shape ({1:d}, {2:d}) epochs {3:d} gaus {4:d} hidden units {5:d}          #'.format(netType,input_shape1, input_shape2, numberOfEpochs, gaus, hiddenUnits))
         print('##################################################################################')
         rgb = True
         twoD = False
@@ -152,6 +152,11 @@ def main(argv):
 
         print("train_model_with_generator")
         train_model_with_generator(model, training_gen, validation_gen, numberOfEpochs,netType)
+
+        training_dist = training_gen.GetDistribution()
+        validation_dist = validation_gen.GetDistribution()
+        print('training distribution', training_dist)
+        print('validation distribution', validation_dist)
 
 
 if __name__ == "__main__":  
