@@ -12,7 +12,8 @@ from skimage.color import gray2rgb
 
 class MatrixPreLoader(object):
     def __init__(self, dataset_directory, patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
-        print(activity_types)
+        print('patients_to_use:', patients_to_use)
+        print('activity_types:', activity_types)
         self.master_directory = dataset_directory
         self.print_loading_progress = print_loading_progress
         self.patients = self.get_patient_list(patients_to_use)
@@ -60,7 +61,7 @@ class MatrixPreLoader(object):
     def get_session1_lab_data_directory(self, patient_directories,patients_to_use):
         directories = []
         for patient_directory in patient_directories:
-            if type(patients_to_use) is str:
+            if type(patients_to_use) is str and patients_to_use != "ALL":
                 patient_name = self.PatientName(patient_directory)
                 if not patient_name in patients_to_use:
                     continue

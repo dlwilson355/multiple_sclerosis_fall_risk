@@ -69,7 +69,7 @@ def main(argv):
     gaus = 0.01
     numberOfEpochs = 30
     hiddenUnits = 75
-    num_patients = 'ALL'
+    patients_to_use = 'ALL'
     folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
         opts, args = getopt.getopt(argv,"?f:t:1:2:g:e:h:p:")
@@ -96,17 +96,17 @@ def main(argv):
             hiddenUnits = int(arg)
         elif opt == '-p':
             try:
-                num_patients = int(arg)
+                patients_to_use = int(arg)
             except ValueError:
-                num_patients = arg
+                patients_to_use = arg
 
 
 
     if 'Plt' == netType:
-        vis = Visualize(folder, num_patients, True)
+        vis = Visualize(folder, patients_to_use, True)
         vis.run()
     elif 'Img' == netType:
-        vis = Visualize(folder, num_patients, False)
+        vis = Visualize(folder, patients_to_use, False)
         vis.run()
     elif 'Table'== netType:
         table = DataTable(folder)
@@ -124,7 +124,7 @@ def main(argv):
         batchSize = 32
         input_shape = (input_shape1, input_shape2)
         activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
-        preLoader = MatrixPreLoader(dataset_directory = folder, patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
+        preLoader = MatrixPreLoader(dataset_directory = folder, patients_to_use = patients_to_use, activity_types = activities_to_load, print_loading_progress = True)
         num_features = preLoader.get_number_of_patients()
         if NETTYPE_VGGBN == netTypeVal:
             vgg = VGG16Imp()
