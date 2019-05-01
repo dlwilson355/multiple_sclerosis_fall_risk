@@ -11,11 +11,11 @@ from skimage.transform import resize
 from skimage.color import gray2rgb
 
 class MatrixPreLoader(object):
-    def __init__(self, dataset_directory, num_patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
+    def __init__(self, dataset_directory, patients_to_use = "ALL", activity_types = "ALL", print_loading_progress = False):
         print(activity_types)
         self.master_directory = dataset_directory
         self.print_loading_progress = print_loading_progress
-        self.patients = self.get_patient_list(num_patients_to_use)
+        self.patients = self.get_patient_list(patients_to_use)
         self.preloaded_patient_sensor_data = self.preload_patient_sensor_data(self.patients)
         self.preloaded_activity_start_and_end_indicies = self.preload_activity_start_and_end_indicies(self.patients, self.preloaded_patient_sensor_data, activity_types)
         self.dimension = self.calculate_default_image_dimension(self.patients, self.preloaded_patient_sensor_data, self.preloaded_activity_start_and_end_indicies)
@@ -44,18 +44,26 @@ class MatrixPreLoader(object):
         patient_data = self.preloaded_patient_sensor_data[patient]
         return len(patient_data)
 
-    def get_patient_list(self, num_patients):
+    def get_patient_list(self, patients_to_use):
         patients = glob.glob(os.path.join(self.master_directory, "*", ""))
-        patients = self.get_session1_lab_data_directory(patients)
+        patients = self.get_session1_lab_data_directory(patients,patients_to_use)
         patients = self.remove_patients_with_incomplete_data(patients)
-        if (not num_patients == "ALL"):
-            patients = patients[0:num_patients]
+        if (type(patients_to_use) is int):
+            patients = patients[0:patients_to_use]
         return (patients)
 
+    def PatientName(self, folder):
+        p = folder[4:].find("\\") + 1
+        return folder[4+p:4+p+5]
+
     # returns a list of directories from the session 1 lab MC10 test corresponding to the list of passed patient directories
-    def get_session1_lab_data_directory(self, patient_directories):
+    def get_session1_lab_data_directory(self, patient_directories,patients_to_use):
         directories = []
         for patient_directory in patient_directories:
+            if type(patients_to_use) is str:
+                patient_name = self.PatientName(patient_directory)
+                if not patient_name in patients_to_use:
+                    continue
             directories.append(os.path.join(patient_directory, "Session_1", "Lab", "MC10"))
         return (directories)
 

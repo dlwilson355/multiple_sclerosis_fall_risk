@@ -17,7 +17,7 @@ class Visualize(object):
         if file.exists() == False:
             os.mkdir(self.subfolder)
         activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
-        self.preLoader = MatrixPreLoader(directory = directory, num_patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
+        self.preLoader = MatrixPreLoader(directory = directory, patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
         self.patients = self.preLoader.Get_patients()
         self.train_gen =  MatrixDataGenerator(self.preLoader,rgb = False, twoD = True, batch_size = 1, add_gaussian_noise = .01, overflow = "BEFORE", grab_data_from = (0,0.7), print_loading_progress = False)
         self.test_gen =  MatrixDataGenerator(self.preLoader,rgb = False, twoD = True, batch_size = 1, add_gaussian_noise = .01, overflow = "BEFORE", grab_data_from = (0.7,1), print_loading_progress = False)

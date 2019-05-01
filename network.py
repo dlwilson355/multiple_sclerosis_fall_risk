@@ -95,7 +95,12 @@ def main(argv):
         elif opt == '-h':
             hiddenUnits = int(arg)
         elif opt == '-p':
-            num_patients = int(arg)
+            try:
+                num_patients = int(arg)
+            except ValueError:
+                num_patients = arg
+
+
 
     if 'Plt' == netType:
         vis = Visualize(folder, num_patients, True)
@@ -119,7 +124,7 @@ def main(argv):
         batchSize = 32
         input_shape = (input_shape1, input_shape2)
         activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
-        preLoader = MatrixPreLoader(dataset_directory = folder, num_patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
+        preLoader = MatrixPreLoader(dataset_directory = folder, patients_to_use = num_patients, activity_types = activities_to_load, print_loading_progress = True)
         num_features = preLoader.get_number_of_patients()
         if NETTYPE_VGGBN == netTypeVal:
             vgg = VGG16Imp()
