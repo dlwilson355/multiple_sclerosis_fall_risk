@@ -9,9 +9,10 @@ import numpy as np
 import pandas as pd
 
 class FeatureExtractor(keras.utils.Sequence):
-    def __init__(self, matrix_data_generator, fall_filepath, weigths_filepath):
+    def __init__(self, matrix_data_generator, fall_filepath, weigths_filepath, test=False):
         self.matrix_data_generator = matrix_data_generator
         self.fall_values = self.get_fall_dataframe(fall_filepath)
+        self.test = test
         model = VGG16(weights = weigths_filepath, classes=15)
         model.layers.pop() # remove the last layer to extract features from it
         self.feature_extracting_model = keras.Model(model.input, model.layers[-1].output)
@@ -27,6 +28,14 @@ class FeatureExtractor(keras.utils.Sequence):
         matricies, one_hot = self.matrix_data_generator.__getitem__()
         X = self.get_feature_batch(matricies)
         X = tf.keras.utils.normalize(X, axis=-1)
+        """
+        if (self.test):
+            for i in range(X.shape[0]):
+                print("start")
+                print(one_hot[i])
+                print(X[i][0:20])
+                print("end")
+        """
         y = self.get_fall_values(one_hot)
         return X, y
 
@@ -43,22 +52,22 @@ class FeatureExtractor(keras.utils.Sequence):
             filepath = self.get_corresponding_patient_filepath(one_hot_array[i, ])
             patient_id = self.get_patient_ID(filepath)
             fell = self.get_patient_fell(patient_id)
-            fall_values.append([fell])
+            fall_values.append(fell)
         yData = np.array(fall_values)
         return (yData)
 
     # returns the patient filepath corresponding to each patient encoded as one-hot
     def get_corresponding_patient_filepath(self, one_hot):
-        return (self.matrix_data_generator.preloader.Get_patients()[np.where(one_hot == 1)[0][0]])
+        return (self.matrix_data_generator.preLoader.Get_patients()[np.where(one_hot == 1)[0][0]])
 
     # returns an integer representing whether the patient fell: 1 indicates they fell, 0 indicates they did not fall using patient ID as an arugment (eg: S0002)
     def get_patient_fell(self, patient_ID):
         row = self.fall_values.loc[patient_ID]
         fell = row['Fall']
         if (fell == 'y'):
-            fall_value = 1
+            fall_value = [1, 0]#[1]
         else:
-            fall_value = 0
+            fall_value = [0, 1]#[0]
         return (fall_value)
 
     # returns the ID of a patient from its filepath (eg: S0002)
