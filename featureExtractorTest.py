@@ -11,20 +11,17 @@ from featureExtractor import FeatureExtractor
 patient_fall_filepath = "D:\\deep learning dataset\\MS Fall Study\\SubjectInfo.csv"
 training_filepath = "D:\\deep learning dataset\\training features" # the filepath to the sensor data for the patients from which features will be extracted when training
 testing_filepath = "D:\\deep learning dataset\\testing features" # the filepath to the sensor data for the patients from which features will be extracted when testing
-weigths_filepath = "C:\\Users\\Daniel\\Desktop\\weights(first 15 patients training)-08-0.56.hdf5" # the filepath to the weights of the classification model
+weigths_filepath = "D:\\deep learning dataset\\weights(ResNet)-27-1.00.hdf5" # the filepath to the weights of the classification model
 activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Standing Balance Assessment", "Standing Balance Eyes Closed", "ADL: Normal Walking", "ADL: Normal Standing", "ADL: Normal Sitting", "ADL: Slouch sitting", "ADL: Lying on back", "ADL: Lying on left side", "ADL: Lying on right side"]
-
-training_filepath = "D:\\deep learning dataset\\MS Fall Study"
-testing_filepath = "D:\\deep learning dataset\\MS Fall Study"
 
 def create_generators():
     # creating training generator
-    preloader = MatrixPreLoader(dataset_directory = training_filepath, num_patients_to_use = "ALL", activity_types = activities_to_load, print_loading_progress = False)
+    preloader = MatrixPreLoader(dataset_directory = training_filepath, num_patients_to_use = 1, activity_types = activities_to_load, print_loading_progress = False)
     matrix_data_generator = MatrixDataGenerator(preloader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = 0, zero_sensors = 0, batch_size = 32, grab_data_from = (0, 1), overflow = "BEFORE", print_loading_progress = False)
     training_generator = FeatureExtractor(matrix_data_generator, patient_fall_filepath, weigths_filepath, test=True)
 
     # create testing generator
-    preloader = MatrixPreLoader(dataset_directory = testing_filepath, num_patients_to_use = "ALL", activity_types = activities_to_load, print_loading_progress = False)
+    preloader = MatrixPreLoader(dataset_directory = testing_filepath, num_patients_to_use = 1, activity_types = activities_to_load, print_loading_progress = False)
     matrix_data_generator = MatrixDataGenerator(preloader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = 0, zero_sensors = 3, batch_size = 32, grab_data_from = (0, 1), overflow = "BEFORE", print_loading_progress = False)
     testing_generator = FeatureExtractor(matrix_data_generator, patient_fall_filepath, weigths_filepath, test=False)
 
@@ -32,7 +29,7 @@ def create_generators():
 
 def create_model():
     model = keras.models.Sequential()
-    model.add(keras.layers.Dense(512, input_dim = 4096))
+    model.add(keras.layers.Dense(512, input_dim = 1024))
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dense(128))
     model.add(keras.layers.Activation('relu'))

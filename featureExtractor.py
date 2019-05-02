@@ -4,16 +4,19 @@ This is used to extract features from a patient classification model.  These fea
 """
 import keras
 from keras.applications.vgg16 import VGG16
+from keras.applications.resnet50 import ResNet50
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+from resnet import ResNetImp
 
 class FeatureExtractor(keras.utils.Sequence):
     def __init__(self, matrix_data_generator, fall_filepath, weigths_filepath, test=False):
         self.matrix_data_generator = matrix_data_generator
         self.fall_values = self.get_fall_dataframe(fall_filepath)
         self.test = test
-        model = VGG16(weights = weigths_filepath, classes=15)
+        model = ResNetImp().ResNet(input_shape = (224, 224, 3), classes = 16)
+        model.load_weights(weigths_filepath)
         model.layers.pop() # remove the last layer to extract features from it
         self.feature_extracting_model = keras.Model(model.input, model.layers[-1].output)
         self.feature_extracting_model._make_predict_function()
@@ -28,14 +31,6 @@ class FeatureExtractor(keras.utils.Sequence):
         matricies, one_hot = self.matrix_data_generator.__getitem__()
         X = self.get_feature_batch(matricies)
         X = tf.keras.utils.normalize(X, axis=-1)
-        """
-        if (self.test):
-            for i in range(X.shape[0]):
-                print("start")
-                print(one_hot[i])
-                print(X[i][0:20])
-                print("end")
-        """
         y = self.get_fall_values(one_hot)
         return X, y
 
