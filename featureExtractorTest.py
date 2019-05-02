@@ -16,12 +16,12 @@ activities_to_load = ["30s Chair Stand Test", "Tandem Balance Assessment", "Stan
 
 def create_generators():
     # creating training generator
-    preloader = MatrixPreLoader(dataset_directory = training_filepath, num_patients_to_use = 1, activity_types = activities_to_load, print_loading_progress = False)
+    preloader = MatrixPreLoader(dataset_directory = training_filepath, patients_to_use = "ALL", activity_types = activities_to_load, print_loading_progress = False)
     matrix_data_generator = MatrixDataGenerator(preloader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = 0, zero_sensors = 0, batch_size = 32, grab_data_from = (0, 1), overflow = "BEFORE", print_loading_progress = False)
     training_generator = FeatureExtractor(matrix_data_generator, patient_fall_filepath, weigths_filepath, test=True)
 
     # create testing generator
-    preloader = MatrixPreLoader(dataset_directory = testing_filepath, num_patients_to_use = 1, activity_types = activities_to_load, print_loading_progress = False)
+    preloader = MatrixPreLoader(dataset_directory = testing_filepath, patients_to_use = "ALL", activity_types = activities_to_load, print_loading_progress = False)
     matrix_data_generator = MatrixDataGenerator(preloader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = 0, zero_sensors = 3, batch_size = 32, grab_data_from = (0, 1), overflow = "BEFORE", print_loading_progress = False)
     testing_generator = FeatureExtractor(matrix_data_generator, patient_fall_filepath, weigths_filepath, test=False)
 
