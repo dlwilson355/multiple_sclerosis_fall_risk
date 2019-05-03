@@ -61,7 +61,7 @@ class MatrixPreLoader(object):
     def get_session1_lab_data_directory(self, patient_directories,patients_to_use):
         directories = []
         for patient_directory in patient_directories:
-            if type(patients_to_use) is str and patients_to_use != "ALL":
+            if type(patients_to_use) is str and not patients_to_use == "ALL":
                 patient_name = self.PatientName(patient_directory)
                 if not patient_name in patients_to_use:
                     continue
@@ -199,7 +199,7 @@ class MatrixPreLoader(object):
 
 class MatrixDataGenerator(keras.utils.Sequence):
     def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, normalize = True, add_gaussian_noise = 0, zero_sensors = 0, batch_size=32, grab_data_from = (0, .75), overflow="AFTER", print_loading_progress = False):
-        print(matrix_dimensions ,rgb,twoD,add_gaussian_noise,zero_sensors,batch_size,grab_data_from,overflow)
+        #print(matrix_dimensions ,rgb,twoD,add_gaussian_noise,zero_sensors,batch_size,grab_data_from,overflow)
         self.matrix_dimensions = matrix_dimensions
         self.rgb = rgb
         self.twoD = twoD

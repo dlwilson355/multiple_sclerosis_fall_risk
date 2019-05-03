@@ -4,15 +4,19 @@ This is used to extract features from a patient classification model.  These fea
 """
 import keras
 from keras.applications.vgg16 import VGG16
+from keras.applications.resnet50 import ResNet50
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+from resnet import ResNetImp
 
 class FeatureExtractor(keras.utils.Sequence):
-    def __init__(self, matrix_data_generator, fall_filepath, weigths_filepath):
+    def __init__(self, matrix_data_generator, fall_filepath, weigths_filepath, test=False):
         self.matrix_data_generator = matrix_data_generator
         self.fall_values = self.get_fall_dataframe(fall_filepath)
-        model = VGG16(weights = weigths_filepath, classes=15)
+        self.test = test
+        model = ResNetImp().ResNet(input_shape = (224, 224, 3), classes = 16)
+        model.load_weights(weigths_filepath)
         model.layers.pop() # remove the last layer to extract features from it
         self.feature_extracting_model = keras.Model(model.input, model.layers[-1].output)
         self.feature_extracting_model._make_predict_function()
@@ -43,22 +47,22 @@ class FeatureExtractor(keras.utils.Sequence):
             filepath = self.get_corresponding_patient_filepath(one_hot_array[i, ])
             patient_id = self.get_patient_ID(filepath)
             fell = self.get_patient_fell(patient_id)
-            fall_values.append([fell])
+            fall_values.append(fell)
         yData = np.array(fall_values)
         return (yData)
 
     # returns the patient filepath corresponding to each patient encoded as one-hot
     def get_corresponding_patient_filepath(self, one_hot):
-        return (self.matrix_data_generator.preloader.Get_patients()[np.where(one_hot == 1)[0][0]])
+        return (self.matrix_data_generator.preLoader.Get_patients()[np.where(one_hot == 1)[0][0]])
 
     # returns an integer representing whether the patient fell: 1 indicates they fell, 0 indicates they did not fall using patient ID as an arugment (eg: S0002)
     def get_patient_fell(self, patient_ID):
         row = self.fall_values.loc[patient_ID]
         fell = row['Fall']
         if (fell == 'y'):
-            fall_value = 1
+            fall_value = [1, 0]#[1]
         else:
-            fall_value = 0
+            fall_value = [0, 1]#[0]
         return (fall_value)
 
     # returns the ID of a patient from its filepath (eg: S0002)
