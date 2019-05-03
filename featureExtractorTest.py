@@ -22,7 +22,7 @@ def create_generators():
 
     # create testing generator
     preloader = MatrixPreLoader(dataset_directory = testing_filepath, patients_to_use = "ALL", activity_types = activities_to_load, print_loading_progress = False)
-    matrix_data_generator = MatrixDataGenerator(preloader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = 0, zero_sensors = 3, batch_size = 32, grab_data_from = (0, 1), overflow = "BEFORE", print_loading_progress = False)
+    matrix_data_generator = MatrixDataGenerator(preloader, matrix_dimensions = (224, 224), rgb = True, twoD = False, add_gaussian_noise = 0, zero_sensors = 3, batch_size = 50, grab_data_from = (0, 1), overflow = "BEFORE", print_loading_progress = False)
     testing_generator = FeatureExtractor(matrix_data_generator, patient_fall_filepath, weigths_filepath, test=False)
 
     return training_generator, testing_generator
@@ -31,9 +31,13 @@ def create_model():
     model = keras.models.Sequential()
     model.add(keras.layers.Dense(512, input_dim = 1024))
     model.add(keras.layers.Activation('relu'))
+    model.add(keras.layers.Dense(256))
+    model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dense(128))
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dense(32))
+    model.add(keras.layers.Activation('relu'))
+    model.add(keras.layers.Dense(8))
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dense(2))
     model.add(keras.layers.Activation('softmax'))
