@@ -16,3 +16,15 @@ class ResNetImp(object):
         model = keras.models.Model(inputs=base_model.input, outputs=predictions)
         return model
 
+    def ResNetP(self, weights, input_shape=None, classes=1000):
+        base_model = ResNet50(include_top=False, weights=None,  pooling=None, classes=classes,input_shape=input_shape)
+        base_model.load_weights(weights,by_name=True)
+        # freeze all base layers
+        for layer in base_model.layers:
+            layer.trainable = False
+        x = base_model.output
+        x = keras.layers.GlobalAveragePooling2D()(x)
+        x = keras.layers.Dense(1024, activation='relu')(x)
+        predictions = keras.layers.Dense(classes, activation='softmax')(x)
+        model = keras.models.Model(inputs=base_model.input, outputs=predictions)
+        return model

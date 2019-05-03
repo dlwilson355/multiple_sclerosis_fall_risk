@@ -30,6 +30,7 @@ NETTYPE_RESNET = 3
 NETTYPE_SIMPLE = 4
 NETTYPE_GRU = 5
 NETTYPE_LSTM = 6
+NETTYPE_RESNETP = 7
 
 def GetType(netType):
     if 'VGGBN'== netType:
@@ -44,35 +45,40 @@ def GetType(netType):
         return NETTYPE_GRU
     elif 'LSTM' == netType:
         return NETTYPE_LSTM
+    elif 'ResNetP'== netType:
+        return NETTYPE_RESNETP
     return NETTYPE_INVALID
 
 
 def Help():
     print('''network.py 
-             -f <"folder", def: "D:\\deep learning dataset\\MS Fall Study">
-             -t <Network type: VGGBN, VGG16, Simple, GRU, LSTM, Plt,Img,Table def: VGG16> 
+             -f <folder, def: "D:\\deep learning dataset\\MS Fall Study">
+             -t <Network type: ResNet, ResNetP, VGGBN, VGG16, Simple, GRU, LSTM, Plt,Img,Table def: ResNet> 
                 Plt - generate plots for all patients and all activities over all sensors
                 Img - generate images for all patients and all activities over all sensors
                 Table - generate csv file for all patients, all activities, all sensors with indices, frequencies, min, max, mean and stdev
+                ResNetP - pretrained ResNet
              -1 <first part of input shape argument, def: 224> 
              -2 <second part of input shape argument, def: 224> 
-             -g <gaussian noise for training, def: 0.01>
+             -w <weights file, def: ''>
+             -g <gaussian noise for training, def: 0>
              -e <number of epochs, def: 30> 
              -h <number of hidden units, def:75>
              -p <number of patients to use, def:ALL>''')
 
 def main(argv):
     # setup options from command line
-    netType = 'VGG16'
+    netType = 'ResNet'
     input_shape1 = 224
     input_shape2 = 224
-    gaus = 0.01
+    gaus = 0
     numberOfEpochs = 30
     hiddenUnits = 75
     patients_to_use = 'ALL'
+    weights = ''
     folder = "D:\\deep learning dataset\\MS Fall Study"
     try:
-        opts, args = getopt.getopt(argv,"?f:t:1:2:g:e:h:p:")
+        opts, args = getopt.getopt(argv,"?f:t:1:2:g:e:h:p:w:")
     except getopt.GetoptError:
         Help()
         return
@@ -82,6 +88,8 @@ def main(argv):
             return
         elif opt == '-f':
             folder = arg
+        elif opt == '-w':
+            weights = arg
         elif opt == '-t':
             netType = arg
         elif opt == '-1':
@@ -134,6 +142,9 @@ def main(argv):
         elif NETTYPE_RESNET == netTypeVal:
             resnet = ResNetImp()
             model = resnet.ResNet((input_shape1,input_shape2,3),num_features)
+        elif NETTYPE_RESNETP == netTypeVal:
+            resnet = ResNetImp()
+            model = resnet.ResNetP(weights,(input_shape1,input_shape2,3),num_features)
         elif NETTYPE_SIMPLE == netTypeVal:
             rgb = False
             twoD = True
@@ -166,3 +177,5 @@ def main(argv):
 
 if __name__ == "__main__":  
     main(sys.argv[1:])
+#-f "E:\MS Fall Study"  -t ResNet -1 224 -2 224 -g 0 -e 4 -p "S0002 S0003 S0005 S0008 S0015 S0017 S0019 S0020 S0021 S0022"
+#-f "E:\MS Fall Study"  -t ResNetP -1 224 -2 224 -g 0 -e 4 -w "weights(ResNet)-11-1.00.hdf5" -p "S0002 S0003 S0005 S0008 S0015 S0017 S0019 S0020 S0021 S0022 S0012 S0013 S0014 S0016"
