@@ -1,18 +1,21 @@
+import numpy as np
+import pandas as pd
 from keras.applications.vgg16 import VGG16
 from keras.callbacks import ModelCheckpoint
 from keras.optimizers import Adam
 import sys, getopt
+from sklearn.metrics import confusion_matrix,classification_report
 from recurrentnetwork import RNNImp
 from visualize import Visualize
 from table import DataTable
 from vgg16 import VGG16Imp
 from resnet import ResNetImp
-from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader
+from matrixDataGenerator import MatrixDataGenerator, MatrixPreLoader, MatrixFallGenerator
 
 
 def create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize):
-        training_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = gaus, zero_sensors = 0, batch_size = batchSize, grab_data_from = (0, .7), overflow = "BEFORE", print_loading_progress = False)
-        validation_generator = MatrixDataGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = 0, zero_sensors = 0, batch_size = batchSize, grab_data_from = (.7, 1), overflow = "AFTER", print_loading_progress = False)
+        training_generator = MatrixFallGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = gaus, zero_sensors = 0, batch_size = batchSize, grab_data_from = (0, .7), overflow = "BEFORE", print_loading_progress = False)
+        validation_generator = MatrixFallGenerator(preLoader, matrix_dimensions = input_shape, rgb = rgb, twoD = twoD, add_gaussian_noise = 0, zero_sensors = 0, batch_size = batchSize, grab_data_from = (.7, 1), overflow = "AFTER", print_loading_progress = False)
         return training_generator, validation_generator
 
 def train_model_with_generator(model, training_generator, validation_generator,numberOfEpochs,netType):
@@ -23,6 +26,22 @@ def train_model_with_generator(model, training_generator, validation_generator,n
         model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
         model.fit_generator(training_generator, epochs=numberOfEpochs, steps_per_epoch=10, validation_steps=10, validation_data=validation_generator, callbacks=[checkpoint])
 
+def predict_with_generator(model, generator,preLoader):
+        optimizer = Adam(lr=0.0001)
+        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+        y_pred = model.predict_generator(generator, 1000, verbose=1)
+        y_pred = np.argmax(y_pred, axis=1)
+        ytrue = generator.get_y_true()
+        # reshape from 10*32,14 to 1x320,
+        y_true = np.stack(ytrue)
+        y_true = np.resize(y_true,(y_pred.shape[0]))
+        print('confusion matrix',confusion_matrix(y_true, y_pred))
+        patient_names = []
+        for patient in preLoader.Get_patients():
+            name = preLoader.PatientName(patient)
+            patient_names.append(name)
+        print('classification',classification_report(y_true, y_pred, target_names=patient_names))
+
 NETTYPE_INVALID = 0
 NETTYPE_VGGBN = 1
 NETTYPE_VGG16 = 2
@@ -30,7 +49,8 @@ NETTYPE_RESNET = 3
 NETTYPE_SIMPLE = 4
 NETTYPE_GRU = 5
 NETTYPE_LSTM = 6
-NETTYPE_RESNETP = 7
+NETTYPE_RESNETPT = 7
+NETTYPE_RESNETPD = 8
 
 def GetType(netType):
     if 'VGGBN'== netType:
@@ -47,6 +67,10 @@ def GetType(netType):
         return NETTYPE_LSTM
     elif 'ResNetP'== netType:
         return NETTYPE_RESNETP
+    elif 'ResNetPT'== netType:
+        return NETTYPE_RESNETPT
+    elif 'ResNetPD'== netType:
+        return NETTYPE_RESNETPD
     return NETTYPE_INVALID
 
 
@@ -142,7 +166,7 @@ def main(argv):
         elif NETTYPE_RESNET == netTypeVal:
             resnet = ResNetImp()
             model = resnet.ResNet((input_shape1,input_shape2,3),num_features)
-        elif NETTYPE_RESNETP == netTypeVal:
+        elif NETTYPE_RESNETPT == netTypeVal or NETTYPE_RESNETPD == netTypeVal:
             resnet = ResNetImp()
             model = resnet.ResNetP(weights,(input_shape1,input_shape2,3),num_features)
         elif NETTYPE_SIMPLE == netTypeVal:
@@ -166,16 +190,21 @@ def main(argv):
         print("create_generators")
         training_gen, validation_gen = create_generators(preLoader, input_shape, rgb, twoD, gaus, batchSize)
 
-        print("train_model_with_generator")
-        train_model_with_generator(model, training_gen, validation_gen, numberOfEpochs,netType)
+        if NETTYPE_RESNETPD == netTypeVal:
+            print("predict_with_generator")
+            predict_with_generator(model, validation_gen, preLoader)
+        else:
+            print("train_model_with_generator")
+            train_model_with_generator(model, training_gen, validation_gen, numberOfEpochs,netType)
 
-        training_dist = training_gen.GetDistribution()
-        validation_dist = validation_gen.GetDistribution()
-        print('training distribution', training_dist)
-        print('validation distribution', validation_dist)
+            training_dist = training_gen.GetDistribution()
+            validation_dist = validation_gen.GetDistribution()
+            print('training distribution', training_dist)
+            print('validation distribution', validation_dist)
 
 
 if __name__ == "__main__":  
     main(sys.argv[1:])
 #-f "E:\MS Fall Study"  -t ResNet -1 224 -2 224 -g 0 -e 4 -p "S0002 S0003 S0005 S0008 S0015 S0017 S0019 S0020 S0021 S0022"
-#-f "E:\MS Fall Study"  -t ResNetP -1 224 -2 224 -g 0 -e 4 -w "weights(ResNet)-11-1.00.hdf5" -p "S0002 S0003 S0005 S0008 S0015 S0017 S0019 S0020 S0021 S0022 S0012 S0013 S0014 S0016"
+#-f "E:\MS Fall Study"  -t ResNetPT -1 224 -2 224 -g 0 -e 4 -w "weights(ResNet)-11-1.00.hdf5" -p "S0002 S0003 S0005 S0008 S0015 S0017 S0019 S0020 S0021 S0022 S0012 S0013 S0014 S0016"
+#-f "E:\MS Fall Study"  -t ResNetPD -1 224 -2 224 -g 0 -w "weights(ResNet)-11-1.00.hdf5" -p "S0002 S0003 S0005 S0008 S0015 S0017 S0019 S0020 S0021 S0022 S0012 S0013 S0014 S0016"

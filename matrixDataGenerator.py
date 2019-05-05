@@ -213,6 +213,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
         self.len = int(np.floor(len(self.preLoader.Get_patients()) / self.batch_size)) + 1
         self.normalize = normalize
         self.distribution = np.zeros(self.preLoader.get_number_of_patients())
+        self.y_true = []
 
     # returns the number of batches per epoch
     def __len__(self):
@@ -221,6 +222,9 @@ class MatrixDataGenerator(keras.utils.Sequence):
     def GetDistribution(self):
         return self.distribution
 
+    def get_y_true(self):
+        return self.y_true
+
     # generates a batch of data, the index argument doesn't do anything
     def __getitem__(self, index=0):
         patient_indexes = [random.randint(0, len(self.preLoader.Get_patients())-1) for i in range(self.batch_size)]
@@ -228,7 +232,7 @@ class MatrixDataGenerator(keras.utils.Sequence):
             self.distribution[k] = self.distribution[k] + 1
         patients_selected = [self.preLoader.Get_patients()[k] for k in patient_indexes]
         X, y = self.data_generation(patients_selected)
-
+        self.y_true.append(y)
         return X, y
 
     # calls the function to create a data matrix for the each patient in patients and then transforms it appropriately with resizing, adding rgb channels, adding gaussing noise, reshaping, ect...
@@ -315,3 +319,8 @@ class MatrixDataGenerator(keras.utils.Sequence):
     def print_if_loading(self, string):
         if (self.print_loading_progress):
             print(string)
+
+class MatrixFallGenerator(MatrixDataGenerator):
+    def __init__(self, preLoader, matrix_dimensions = "NONE", rgb = False, twoD = False, normalize = True, add_gaussian_noise = 0, zero_sensors = 0, batch_size=32, grab_data_from = (0, .75), overflow="AFTER", print_loading_progress = False):
+        super(MatrixFallGenerator,self).__init__(preLoader, matrix_dimensions, rgb, twoD, normalize, add_gaussian_noise, zero_sensors, batch_size, grab_data_from, overflow, print_loading_progress)
+        return
